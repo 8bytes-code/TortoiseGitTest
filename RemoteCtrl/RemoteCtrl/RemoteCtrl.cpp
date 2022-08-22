@@ -11,6 +11,7 @@
 
 
 // 唯一的应用程序对象
+// local_branch
 
 CWinApp theApp;
 
@@ -34,7 +35,7 @@ int main()
         else
         {
             // TODO: 在此处为应用程序的行为编写代码。
-
+			
         }
     }
     else
