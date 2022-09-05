@@ -2,6 +2,77 @@
 #include "pch.h"
 #include "framework.h"
 
+class CPacket {
+public:
+	CPacket():sHead(0),nLength(0),sCmd(0),sSum(0) {}
+	CPacket(const CPacket& pack) {
+		sHead = pack.sHead;
+		nLength = pack.nLength;
+		sCmd = pack.sCmd;
+		strData = pack.strData;
+		sSum = pack.sSum;
+	}
+	CPacket(const BYTE* pData, size_t& nSize) {
+		size_t i = 0;
+		for (; i < nSize; i++) {
+			if (*(WORD*)(pData + i) == 0xFEFF) {
+				sHead = *(WORD*)(pData + i);
+				//i+=2 避免空包时读到后面的数据
+				i += 2;
+				break;
+			}
+		}
+
+		//此处长度参考包的设计
+		if ((i + 4 + 2 + 2) > nSize) {	//包数据可能不全，或者包头未能全部接收到
+			nSize = 0;
+			return;
+		}
+		nLength = *(WORD*)(pData + i); i += 4;
+		if (nLength + i > nSize) {		//包未完全接受，解析失败就返回
+			nSize = 0;
+			return;
+		}
+		sCmd = *(WORD*)(pData + i);  i += 2;
+
+		if (nLength > 4) {
+			strData.resize(nLength - sCmd - 2 - 2);
+			memcpy((void*)strData.c_str(), pData + i, nLength - 4);
+			i += nLength - 4;
+		}
+		
+		sSum = *(WORD*)(pData + i); i += 2;
+		WORD sum = 0;
+		for (size_t j = 0; j < strData.size(); j++) {
+			sum += BYTE(strData[i]) & 0xFF;
+		}
+
+		if (sum == sSum) {
+			nSize = i;	//head length...
+			return;
+		}
+
+		nSize = 0;
+	}
+	~CPacket(){}
+	CPacket& operator=(const CPacket& pack) {
+		if (this != &pack) {
+			sHead = pack.sHead;
+			nLength = pack.nLength;
+			sCmd = pack.sCmd;
+			strData = pack.strData;
+			sSum = pack.sSum;
+		}
+		return *this;
+	}
+public:
+	WORD sHead;				//包头			2
+	DWORD nLength;			//包长度			4	
+	WORD sCmd;				//控制命令		2
+	std::string strData;	//包数据
+	WORD sSum;				//校验：和校验	2
+};
+
 class CServerSocket {
 public:
 	static CServerSocket* getInstance() {
@@ -43,18 +114,31 @@ public:
 		
 		return true;
 	}
-
+#define BUFFER_SIZE 4096
 	int DealCommand() {
-		if (m_client == -1)return false;
-		char buffer[1024] = "";
+		if (m_client == -1)return -1;
+		//char buffer[1024] = "";
+		
+		char* buffer = new char[BUFFER_SIZE];
+		size_t index = 0;
+		memset(buffer, 0, BUFFER_SIZE);
 		while (true) {
-			int len = recv(m_client, buffer, sizeof(buffer), 0);
+			size_t len = recv(m_client, buffer, BUFFER_SIZE - index, 0);
 			if (len <= 0) {
 				return -1;
 			}
+			index += len;
+			len = index;
 
-			//  TODO:处理命令
+			// TODO:处理命令，来自客户端的buffer
+			m_packet = CPacket((BYTE*)buffer, len);
+			if (len > 0) {
+				memmove(buffer, buffer + len, BUFFER_SIZE - len);
+				index -= len;
+				return m_packet.sCmd;
+			}
 		}
+		return -1;
 	}
 
 	bool Send(const char* pData, int nSize) {
@@ -64,6 +148,7 @@ public:
 private:
 	SOCKET m_client;
 	SOCKET m_sock;
+	CPacket m_packet;
 
 	CServerSocket() {
 		m_client = INVALID_SOCKET;
@@ -71,6 +156,7 @@ private:
 			MessageBox(NULL, _T("无法初始化套接字环境，请检查网络设置！"), _T("初始化错误!"), MB_OK | MB_ICONERROR);
 			exit(0);
 		}
+		m_sock = socket(PF_INET, SOCK_STREAM, 0);
 	}
 	CServerSocket(const CServerSocket& ss) {
 		m_sock = ss.m_sock;

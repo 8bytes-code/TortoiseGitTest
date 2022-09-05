@@ -10,6 +10,12 @@
 #define new DEBUG_NEW
 #endif
 
+// 下列为不熟悉项目属性修改的时候可使用直接源码指定的情况
+// #pragma comment(linker,"/subsystem:windows /entry:WinMainCRTStartup")
+// #pragma comment(linker,"/subsystem:windows /entry:mainCRTStartup")
+// #pragma comment(linker,"/subsystem:console /entry:mainCRTStartup")
+// #pragma comment(linker,"/subsystem:console /entry:WinMainCRTStartup")
+
 
 // 唯一的应用程序对象
 
