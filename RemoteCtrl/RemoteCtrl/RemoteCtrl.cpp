@@ -116,6 +116,65 @@ int MakeDirecteryInfo() {
 	return 0;
 }
 
+int RunFIle() {
+	std::string strPath;
+	CServerSocket::getInstance()->GetFilePath(strPath);
+	ShellExecuteA(NULL, NULL, strPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
+	
+	CPacket pack(3, NULL, 0);
+	CServerSocket::getInstance()->Send(pack);
+
+	return 0;
+}
+
+//#pragma warning(disable:4966) 为一种禁用警告，针对有些老函数不安全的时候
+
+int DownloadFile() {
+	/*
+	 * 首先获取路径
+	 * 然后打开文件，如果失败就结束	
+	 * 能打开就开始读取然后发送直至为空
+	 * 最后关闭
+	*/
+	std::string strPath;
+	CServerSocket::getInstance()->GetFilePath(strPath);
+
+	long long data = 0;
+	FILE* pFile = NULL;
+	errno_t err = fopen_s(&pFile, strPath.c_str(), "rb");
+	if (err != 0) {
+		CPacket pack(4, (BYTE*)&data, 8);
+		CServerSocket::getInstance()->Send(pack);
+		return -1;
+	}
+
+	if (pFile != NULL) {
+		//优化进度条，以免文件过大时空等
+		fseek(pFile, 0, SEEK_END);
+		data = _ftelli64(pFile);
+		CPacket head(4, (BYTE*)&data, 8);
+		fseek(pFile, 0, SEEK_SET);
+
+		char buffer[1024] = "";
+		size_t rlen = 0;
+		do {
+			//每次读1字节，读1024次
+			rlen = fread(buffer, 1, 1024, pFile);
+			//读到之后发送
+			CPacket pack(4, (BYTE*)buffer, rlen);
+			CServerSocket::getInstance()->Send(pack);
+		} while (rlen >= 1024);
+
+		fclose(pFile);
+	}
+	
+	//循环发送完后最后是空代表结束
+	CPacket pack(4, NULL, 0);
+	CServerSocket::getInstance()->Send(pack);
+
+	return 0;
+}
+
 int main() {
 	int nRetCode = 0;
 
@@ -157,7 +216,12 @@ int main() {
 				case 2:		//查看指定目录下的文件
 					MakeDirecteryInfo();
 					break;
-
+				case 3:		//打开文件
+					RunFIle();
+					break;
+				case 4:		//下载文件
+					DownloadFile();
+					break;
 			}
 			
 		}

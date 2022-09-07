@@ -11,8 +11,14 @@ public:
 		sHead = 0xFEFF;
 		nLength = nSize + 4;
 		sCmd = nCmd;
-		strData.resize(nSize);
-		memcpy((void*)strData.c_str(), pData, nSize);
+
+		if (nSize > 0) {
+			strData.resize(nSize);
+			memcpy((void*)strData.c_str(), pData, nSize);
+		} else {
+			strData.clear();
+		}
+
 		sSum = 0;
 		for (size_t j = 0; j < strData.size(); j++) {
 			sSum += BYTE(strData[j]) & 0xFF;
@@ -184,7 +190,7 @@ public:
 
 	bool GetFilePath(std::string& strPath) {
 		//当前命令为2才是去执行获取文件列表
-		if (m_packet.sCmd == 2) {
+		if ((m_packet.sCmd >= 2) && (m_packet.sCmd <= 4)) {
 			strPath = m_packet.strData;
 			return true;
 		}
