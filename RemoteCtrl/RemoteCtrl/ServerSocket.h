@@ -181,6 +181,15 @@ public:
 		if (m_client == -1)return false;
 		return send(m_client, pack.Data(), pack.Size(), 0) > 0;
 	}
+
+	bool GetFilePath(std::string& strPath) {
+		//当前命令为2才是去执行获取文件列表
+		if (m_packet.sCmd == 2) {
+			strPath = m_packet.strData;
+			return true;
+		}
+		return false;
+	}
 private:
 	SOCKET m_client;
 	SOCKET m_sock;
