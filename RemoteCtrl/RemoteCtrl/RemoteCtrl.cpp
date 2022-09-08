@@ -8,6 +8,7 @@
 #include <direct.h>
 #include <corecrt_io.h>
 #include <list>
+#include <atlimage.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -267,6 +268,47 @@ int MouseEvent() {
 	return 0;
 }
 
+int SendScreen() {
+	CImage screen;	//GDI
+	HDC hScreen = ::GetDC(NULL);
+
+	//获取位宽, RGB/888=24 ARGB/8888=32
+	int nBitPerPixel = GetDeviceCaps(hScreen, BITSPIXEL);	
+	int nWidth = GetDeviceCaps(hScreen, HORZRES);
+	int nHeight = GetDeviceCaps(hScreen, VERTRES);
+
+	//创建窗口，按照获取的宽和高还有位宽
+	screen.Create(nWidth, nHeight, nBitPerPixel);
+	BitBlt(screen.GetDC(), 0, 0, 1920, 1020, hScreen, 0, 0, SRCCOPY);
+	ReleaseDC(NULL, hScreen);
+
+	//DWORD tick = GetTickCount64();
+	//TRACE("png %d\r\n", GetTickCount64() - tick);
+	//tick = GetTickCount64();
+	//screen.Save(_T("test2022.jpg"), Gdiplus::ImageFormatJPEG);
+	//TRACE("jpg %d\r\n", GetTickCount64() - tick);
+	
+	//测试时用的是图片文件，但是网络中需要转换成数据流发送
+	HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
+	if (hMem == NULL)return -1;
+	IStream* pstream = NULL;
+	HRESULT ret = CreateStreamOnHGlobal(hMem, TRUE, &pstream);
+	if (ret == S_OK) {
+		screen.Save(pstream, Gdiplus::ImageFormatPNG);
+		LARGE_INTEGER bg = { 0 };
+		pstream->Seek(bg, STREAM_SEEK_SET, NULL);
+		PBYTE pData = (PBYTE)GlobalLock(hMem);
+		SIZE_T nSize = GlobalSize(hMem);
+		CPacket pack(6, NULL, nSize);
+		GlobalLock(hMem);
+	}
+
+	pstream->Release();
+	GlobalFree(hMem);
+	screen.ReleaseDC();
+	return 0;
+}
+
 int main() {
 	int nRetCode = 0;
 
@@ -300,7 +342,7 @@ int main() {
 // 				int ret = pserver->DealCommand();
 // 				//
 // 			}
-			int nCmd = 1;
+			int nCmd = 6;
 			switch (nCmd) {
 				case 1:		//查看磁盘分区
 					MakeDriverInfo();
@@ -316,6 +358,9 @@ int main() {
 					break;
 				case 5:		//鼠标事件
 					MouseEvent();
+					break;
+				case 6:		//发送屏幕内容，本质与传屏幕快照类似
+					SendScreen();
 					break;
 			}
 			
