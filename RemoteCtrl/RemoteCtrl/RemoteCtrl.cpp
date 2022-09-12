@@ -9,6 +9,7 @@
 #include <corecrt_io.h>
 #include <list>
 #include <atlimage.h>
+#include "LockDialog.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -309,12 +310,71 @@ int SendScreen() {
 	return 0;
 }
 
-int LockMachine() {
+CLockDialog dlg;
+unsigned threadid = 0;
+
+unsigned _stdcall threadLockDlg(void* arg) {
+	//创建对话框，显示，不可调整大小|不可移动
+	dlg.Create(IDD_DIALOG_INFO, NULL);
+	dlg.ShowWindow(SW_SHOW);
+	//遮蔽后面的应用
+	CRect rect;
+	rect.left = 0;
+	rect.top = 0;
+	rect.right = GetSystemMetrics(SM_CXFULLSCREEN);
+	rect.bottom = GetSystemMetrics(SM_CXFULLSCREEN);
+	rect.bottom *= 1.03;
+	dlg.MoveWindow(rect);
+	
+	//窗口置顶
+	dlg.SetWindowPos(&dlg.wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+	//隐藏鼠标
+	ShowCursor(false);
+	//隐藏任务栏
+	::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_HIDE);
+
+	rect.left = 0;
+	rect.top = 0;
+	rect.right = 1;
+	rect.bottom = 1;
+	ClipCursor(rect);			//限制鼠标的活动范围
+
+	MSG msg;
+	while (GetMessage(&msg, NULL, 0, 0)) {
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+		if (msg.message == WM_KEYDOWN) {
+			TRACE("msg:%08X wparam:%08X lparam:%08X", msg.message, msg.wParam, msg.lParam);
+			if (msg.wParam == 0x41) {	//按下a键推出 0x1b为esc
+				break;
+			}
+		}
+	}
+	ShowCursor(true);
+	::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_SHOW);
+	dlg.DestroyWindow();
+	_endthread();
 
 	return 0;
 }
 
+int LockMachine() {
+	if ((dlg.m_hWnd != NULL) || (dlg.m_hWnd != INVALID_HANDLE_VALUE)) {
+		//_beginthread(threadLockDlg, 0, NULL);
+		_beginthreadex(NULL, 0, threadLockDlg, NULL, 0, &threadid);
+		TRACE("threadid:%d\r\n", threadid);
+	}
+	
+	CPacket pack(7, NULL, 0);
+	CServerSocket::getInstance()->Send(pack);
+	return 0;
+}
+
 int UnlockMachine() {
+	//dlg.SendMessage(WM_KEYDOWN, 0x41, 0x01E0001);
+	PostThreadMessage(threadid, WM_KEYDOWN, 0x41, 0);
+	CPacket pack(7, NULL, 0);
+	CServerSocket::getInstance()->Send(pack);
 
 	return 0;
 }
@@ -352,7 +412,10 @@ int main() {
 // 				int ret = pserver->DealCommand();
 // 				//
 // 			}
-			int nCmd = 6;
+// 
+			
+			//dlg.Create(IDD_DIALOG_INFO, NULL);
+			int nCmd = 7;
 			switch (nCmd) {
 				case 1:		//查看磁盘分区
 					MakeDriverInfo();
@@ -378,6 +441,11 @@ int main() {
 				case 8:		//解锁机
 					UnlockMachine();
 					break;
+			}
+			Sleep(5000);
+			UnlockMachine();
+			while (dlg.m_hWnd != NULL) {
+				Sleep(10);
 			}
 			
 		}
