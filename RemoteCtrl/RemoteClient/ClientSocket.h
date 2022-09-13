@@ -1,12 +1,14 @@
 #pragma once
 #include "pch.h"
 #include "framework.h"
+#include <string>
+#include <vector>
 
 #pragma pack(push)
 #pragma pack(1)
 class CPacket {
 public:
-	CPacket():sHead(0),nLength(0),sCmd(0),sSum(0) {}
+	CPacket() :sHead(0), nLength(0), sCmd(0), sSum(0) {}
 	CPacket(WORD nCmd, const BYTE* pData, size_t nSize) {
 		sHead = 0xFEFF;
 		nLength = nSize + 4;
@@ -59,7 +61,7 @@ public:
 			memcpy((void*)strData.c_str(), pData + i, nLength - 4);
 			i += nLength - 4;
 		}
-		
+
 		sSum = *(WORD*)(pData + i); i += 2;
 		WORD sum = 0;
 		for (size_t j = 0; j < strData.size(); j++) {
@@ -73,7 +75,7 @@ public:
 
 		nSize = 0;
 	}
-	~CPacket(){}
+	~CPacket() {}
 	CPacket& operator=(const CPacket& pack) {
 		if (this != &pack) {
 			sHead = pack.sHead;
@@ -121,55 +123,54 @@ typedef struct MouseEvent {
 	WORD nAction;	//点击、移动、双击
 	WORD nButton;	//左键、右键、中键
 	POINT ptXY;		//坐标
-}MOUSEEV,*PMOUSEEV;
+}MOUSEEV, * PMOUSEEV;
 
-class CServerSocket {
+std::string GetErrInfo(int wsaErrCode);
+
+class CClientSocket {
 public:
-	static CServerSocket* getInstance() {
+	static CClientSocket* getInstance() {
 		//由于静态函数没有this指针无法直接调用
 		if (m_instance == NULL) {
-			m_instance = new CServerSocket();
+			m_instance = new CClientSocket();
 		}
 		return m_instance;
 	}
 
-	bool InitSocket() {
+	bool InitSocket(const std::string& strIPAddress) {
+		if (m_sock != INVALID_SOCKET) CloseSocket();
+		m_sock = socket(PF_INET, SOCK_STREAM, 0);
 		if (m_sock == -1)return false;
 
 		//网络参数
 		sockaddr_in serv_adr;
 		memset(&serv_adr, 0, sizeof(serv_adr));
 		serv_adr.sin_family = AF_INET;
-		serv_adr.sin_addr.S_un.S_addr = INADDR_ANY;
+		serv_adr.sin_addr.S_un.S_addr = inet_addr(strIPAddress.c_str());
 		serv_adr.sin_port = htons(9527);
 
-		//bind
-		if (bind(m_sock, (sockaddr*)&serv_adr, sizeof(serv_adr)) == -1) {
+		if (serv_adr.sin_addr.s_addr == INADDR_NONE) {
+			AfxMessageBox("指定的IP地址不存在！");
 			return false;
 		}
 
-		//listen
-		if (listen(m_sock, 1) == -1) {
+		int ret = connect(m_sock, (sockaddr*)&serv_adr, sizeof(serv_adr));
+		if (ret == -1) {
+			AfxMessageBox("连接失败!");
+			TRACE("连接失败:%d %s\r\n", WSAGetLastError(), GetErrInfo(WSAGetLastError()).c_str());
 			return false;
 		}
 
 		return true;
 	}
 
-	bool AcceptClient() {
-		sockaddr_in client_adr;
-		int cli_sz = sizeof(client_adr);
-		m_client = accept(m_sock, (sockaddr*)&client_adr, &cli_sz);
-		if (m_client == -1)return false;
-		
-		return true;
-	}
+
 #define BUFFER_SIZE 4096
 	int DealCommand() {
-		if (m_client == -1)return -1;
+		if (m_sock == -1)return -1;
 		//char buffer[1024] = "";
-		
-		char* buffer = new char[BUFFER_SIZE];
+
+		char* buffer = m_buffer.data();
 		if (buffer == NULL) {
 			TRACE("内存不足!\r\n");
 			return -2;
@@ -177,12 +178,10 @@ public:
 		size_t index = 0;
 		memset(buffer, 0, BUFFER_SIZE);
 		while (true) {
-			size_t len = recv(m_client, buffer, BUFFER_SIZE - index, 0);
+			size_t len = recv(m_sock, buffer, BUFFER_SIZE - index, 0);
 			if (len <= 0) {
-				delete[] buffer;
 				return -1;
 			}
-			TRACE("recv:%d\r\n", len);
 			index += len;
 			len = index;
 
@@ -191,22 +190,20 @@ public:
 			if (len > 0) {
 				memmove(buffer, buffer + len, BUFFER_SIZE - len);
 				index -= len;
-				delete[] buffer;
 				return m_packet.sCmd;
 			}
 		}
-		delete[] buffer;
 		return -1;
 	}
 
 	bool Send(const char* pData, int nSize) {
-		if (m_client == -1)return false;
-		return send(m_client, pData, nSize, 0) > 0;
+		if (m_sock == -1)return false;
+		return send(m_sock, pData, nSize, 0) > 0;
 	}
 
 	bool Send(CPacket& pack) {
-		if (m_client == -1)return false;
-		return send(m_client, pack.Data(), pack.Size(), 0) > 0;
+		if (m_sock == -1)return false;
+		return send(m_sock, pack.Data(), pack.Size(), 0) > 0;
 	}
 
 	bool GetFilePath(std::string& strPath) {
@@ -230,31 +227,29 @@ public:
 	CPacket& GetPacket() {
 		return m_packet;
 	}
-
-	void CloseClient() {
-		closesocket(m_client);
-		m_client = INVALID_SOCKET;
+	
+	void CloseSocket() {
+		closesocket(m_sock);
+		m_sock = INVALID_SOCKET;
 	}
 private:
-	SOCKET m_client;
+	std::vector<char> m_buffer;
 	SOCKET m_sock;
 	CPacket m_packet;
 
-	CServerSocket() {
-		m_client = INVALID_SOCKET;
+	CClientSocket() {
 		if (InitSockEnv() == FALSE) {
 			MessageBox(NULL, _T("无法初始化套接字环境，请检查网络设置！"), _T("初始化错误!"), MB_OK | MB_ICONERROR);
 			exit(0);
 		}
-		m_sock = socket(PF_INET, SOCK_STREAM, 0);
+		m_buffer.resize(BUFFER_SIZE);
 	}
-	CServerSocket(const CServerSocket& ss) {
+	CClientSocket(const CClientSocket& ss) {
 		m_sock = ss.m_sock;
-		m_client = ss.m_client;
 	}
-	CServerSocket& operator=(const CServerSocket&ss){}
+	CClientSocket& operator=(const CClientSocket& ss) {}
 
-	~CServerSocket() {
+	~CClientSocket() {
 		closesocket(m_sock);
 		WSACleanup();
 	}
@@ -269,21 +264,21 @@ private:
 
 	static void releaseInstance() {
 		if (m_instance != NULL) {
-			CServerSocket* tmp = m_instance;
+			CClientSocket* tmp = m_instance;
 			m_instance = NULL;
 			delete tmp;
 		}
 	}
 
-	static CServerSocket* m_instance;
+	static CClientSocket* m_instance;
 
 	class CHelper {
 	public:
 		CHelper() {
-			CServerSocket::getInstance();
+			CClientSocket::getInstance();
 		}
 		~CHelper() {
-			CServerSocket::releaseInstance();
+			CClientSocket::releaseInstance();
 		}
 	};
 

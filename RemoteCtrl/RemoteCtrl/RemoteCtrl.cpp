@@ -379,6 +379,49 @@ int UnlockMachine() {
 	return 0;
 }
 
+int TestConnect() {
+	CPacket pack(1981, NULL, 0);
+	bool ret = CServerSocket::getInstance()->Send(pack);
+	TRACE("Send ret:%d\r\n", ret);
+
+	return 0;
+}
+
+int ExcuteCommand(int nCmd) {
+	//dlg.Create(IDD_DIALOG_INFO, NULL);
+	int ret = 0;
+	switch (nCmd) {
+	case 1:		//查看磁盘分区
+		ret = MakeDriverInfo();
+		break;
+	case 2:		//查看指定目录下的文件
+		ret = MakeDirecteryInfo();
+		break;
+	case 3:		//打开文件
+		ret = RunFIle();
+		break;
+	case 4:		//下载文件
+		ret = DownloadFile();
+		break;
+	case 5:		//鼠标事件
+		ret = MouseEvent();
+		break;
+	case 6:		//发送屏幕内容，本质与传屏幕快照类似
+		ret = SendScreen();
+		break;
+	case 7:		//锁机
+		ret = LockMachine();
+		break;
+	case 8:		//解锁机
+		ret = UnlockMachine();
+		break;
+	case 1981:
+		ret = TestConnect();
+		break;
+	}
+	return ret;
+}
+
 int main() {
 	int nRetCode = 0;
 
@@ -391,62 +434,38 @@ int main() {
 			wprintf(L"错误: MFC 初始化失败\n");
 			nRetCode = 1;
 		} else {
-// 			// TODO: 在此处为应用程序的行为编写代码。
-// 			CServerSocket* pserver = CServerSocket::getInstance();
-// 			int count = 0;
-// 
-// 			if (pserver->InitSocket() == false) {
-// 				MessageBox(NULL, _T("网络初始化异常，未能成功初始化，请检查网络状况！"), _T("网络初始化失败"), MB_OK | MB_ICONERROR);
-// 				exit(0);
-// 			}
-// 			while (CServerSocket::getInstance() != NULL) {
-// 				if (pserver->AcceptClient() == false) {
-// 					if (count <= 3) {
-// 						MessageBox(NULL, _T("多次重连仍无法接入，结束本程序！"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
-// 						exit(0);
-// 					}
-// 					MessageBox(NULL, _T("无法正常接入用户，请稍后正在自动重试！"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
-// 					count++;
-// 				}
-// 
-// 				int ret = pserver->DealCommand();
-// 				//
-// 			}
-// 
+			// TODO: 在此处为应用程序的行为编写代码。
+			CServerSocket* pserver = CServerSocket::getInstance();
+			int count = 0;
+
+			if (pserver->InitSocket() == false) {
+				MessageBox(NULL, _T("网络初始化异常，未能成功初始化，请检查网络状况！"), _T("网络初始化失败"), MB_OK | MB_ICONERROR);
+				exit(0);
+			}
+			while (CServerSocket::getInstance() != NULL) {
+				if (pserver->AcceptClient() == false) {
+					if (count <= 3) {
+						MessageBox(NULL, _T("多次重连仍无法接入，结束本程序！"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
+						exit(0);
+					}
+					MessageBox(NULL, _T("无法正常接入用户，请稍后正在自动重试！"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
+					count++;
+				}
+				TRACE("AcceptClient return true\r\n");
+				int ret = pserver->DealCommand();
+				TRACE("DealCommand ret %d\r\n", ret);
+				//TODO:
+				if (ret > 0) {
+					ret = ExcuteCommand(ret);
+					if (ret != 0) {
+						TRACE("执行命令失败：%d ret=%d\r\n", pserver->GetPacket().sCmd, ret);
+					}
+					pserver->CloseClient();
+					TRACE("Command bas done!\r\n");
+				}
+				
+			} 
 			
-			//dlg.Create(IDD_DIALOG_INFO, NULL);
-			int nCmd = 7;
-			switch (nCmd) {
-				case 1:		//查看磁盘分区
-					MakeDriverInfo();
-					break;
-				case 2:		//查看指定目录下的文件
-					MakeDirecteryInfo();
-					break;
-				case 3:		//打开文件
-					RunFIle();
-					break;
-				case 4:		//下载文件
-					DownloadFile();
-					break;
-				case 5:		//鼠标事件
-					MouseEvent();
-					break;
-				case 6:		//发送屏幕内容，本质与传屏幕快照类似
-					SendScreen();
-					break;
-				case 7:		//锁机
-					LockMachine();
-					break;
-				case 8:		//解锁机
-					UnlockMachine();
-					break;
-			}
-			Sleep(5000);
-			UnlockMachine();
-			while (dlg.m_hWnd != NULL) {
-				Sleep(10);
-			}
 			
 		}
 	} else {
