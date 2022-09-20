@@ -1,12 +1,13 @@
 #pragma once
 #include "pch.h"
 #include "framework.h"
+void Dump(BYTE* pData, size_t nSize);
 
 #pragma pack(push)
 #pragma pack(1)
 class CPacket {
 public:
-	CPacket():sHead(0),nLength(0),sCmd(0),sSum(0) {}
+	CPacket() :sHead(0), nLength(0), sCmd(0), sSum(0) {}
 	CPacket(WORD nCmd, const BYTE* pData, size_t nSize) {
 		sHead = 0xFEFF;
 		nLength = nSize + 4;
@@ -55,11 +56,11 @@ public:
 		sCmd = *(WORD*)(pData + i);  i += 2;
 
 		if (nLength > 4) {
-			strData.resize(nLength - sCmd - 2 - 2);
+			strData.resize(nLength - 2 - 2);
 			memcpy((void*)strData.c_str(), pData + i, nLength - 4);
 			i += nLength - 4;
 		}
-		
+
 		sSum = *(WORD*)(pData + i); i += 2;
 		WORD sum = 0;
 		for (size_t j = 0; j < strData.size(); j++) {
@@ -71,9 +72,9 @@ public:
 			return;
 		}
 
-		nSize = 0;
+		//nSize = 0;
 	}
-	~CPacket(){}
+	~CPacket() {}
 	CPacket& operator=(const CPacket& pack) {
 		if (this != &pack) {
 			sHead = pack.sHead;
@@ -123,6 +124,20 @@ typedef struct MouseEvent {
 	POINT ptXY;		//坐标
 }MOUSEEV,*PMOUSEEV;
 
+typedef struct file_info {
+	//c++中结构体也有构造函数，与类不同在于结构体默认都是public，而类默认是private
+	file_info() {
+		IsInvalid = FALSE;
+		IsDirectory = -1;
+		HasNext = TRUE;
+		memset(szFileName, 0, sizeof(szFileName));
+	}
+	BOOL IsInvalid;			//是否有效
+	BOOL IsDirectory;		//是否为目录 0否 1是
+	BOOL HasNext;			//是否还有后续文件
+	char szFileName[256];	//文件名 0无 1有
+}FILEINFO, * PFILEINFO;
+
 class CServerSocket {
 public:
 	static CServerSocket* getInstance() {
@@ -140,7 +155,7 @@ public:
 		sockaddr_in serv_adr;
 		memset(&serv_adr, 0, sizeof(serv_adr));
 		serv_adr.sin_family = AF_INET;
-		serv_adr.sin_addr.S_un.S_addr = INADDR_ANY;
+		serv_adr.sin_addr.s_addr = INADDR_ANY;
 		serv_adr.sin_port = htons(9527);
 
 		//bind
@@ -177,7 +192,7 @@ public:
 		size_t index = 0;
 		memset(buffer, 0, BUFFER_SIZE);
 		while (true) {
-			size_t len = recv(m_client, buffer, BUFFER_SIZE - index, 0);
+			size_t len = recv(m_client, buffer + index, BUFFER_SIZE - index, 0);
 			if (len <= 0) {
 				delete[] buffer;
 				return -1;
@@ -192,6 +207,7 @@ public:
 				memmove(buffer, buffer + len, BUFFER_SIZE - len);
 				index -= len;
 				delete[] buffer;
+				TRACE("%s", m_packet.strData.c_str());
 				return m_packet.sCmd;
 			}
 		}
@@ -206,6 +222,7 @@ public:
 
 	bool Send(CPacket& pack) {
 		if (m_client == -1)return false;
+		Dump((BYTE*)pack.Data(), pack.Size());
 		return send(m_client, pack.Data(), pack.Size(), 0) > 0;
 	}
 

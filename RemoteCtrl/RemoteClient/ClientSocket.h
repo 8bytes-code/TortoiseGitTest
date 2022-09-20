@@ -125,6 +125,21 @@ typedef struct MouseEvent {
 	POINT ptXY;		//坐标
 }MOUSEEV, * PMOUSEEV;
 
+typedef struct file_info {
+	//c++中结构体也有构造函数，与类不同在于结构体默认都是public，而类默认是private
+	file_info() {
+		IsInvalid = FALSE;
+		IsDirectory = -1;
+		HasNext = TRUE;
+		memset(szFileName, 0, sizeof(szFileName));
+	}
+	BOOL IsInvalid;			//是否有效
+	BOOL IsDirectory;		//是否为目录 0否 1是
+	BOOL HasNext;			//是否还有后续文件
+	char szFileName[256];	//文件名 0无 1有
+}FILEINFO, * PFILEINFO;
+
+
 std::string GetErrInfo(int wsaErrCode);
 
 class CClientSocket {
@@ -146,7 +161,8 @@ public:
 		sockaddr_in serv_adr;
 		memset(&serv_adr, 0, sizeof(serv_adr));
 		serv_adr.sin_family = AF_INET;
-		serv_adr.sin_addr.S_un.S_addr = htonl(nIP);
+		TRACE("addr:%08X nIP:08X\r\n", inet_addr("127.0.0.1"), nIP);
+		serv_adr.sin_addr.s_addr = htonl(nIP);	//需要转换，否则顺序倒置
 		serv_adr.sin_port = htons(nPort);
 
 		if (serv_adr.sin_addr.s_addr == INADDR_NONE) {
@@ -171,21 +187,17 @@ public:
 		//char buffer[1024] = "";
 
 		char* buffer = m_buffer.data();
-		if (buffer == NULL) {
-			TRACE("内存不足!\r\n");
-			return -2;
-		}
 		size_t index = 0;
 		memset(buffer, 0, BUFFER_SIZE);
 		while (true) {
-			size_t len = recv(m_sock, buffer, BUFFER_SIZE - index, 0);
+			size_t len = recv(m_sock, buffer + index, BUFFER_SIZE - index, 0);
 			if (len <= 0) {
 				return -1;
 			}
+			TRACE("recv:%d\r\n", len);
 			index += len;
 			len = index;
 
-			// TODO:处理命令，来自客户端的buffer
 			m_packet = CPacket((BYTE*)buffer, len);
 			if (len > 0) {
 				memmove(buffer, buffer + len, BUFFER_SIZE - len);

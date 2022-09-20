@@ -22,19 +22,7 @@
 // #pragma comment(linker,"/subsystem:console /entry:WinMainCRTStartup")
 
 
-typedef struct file_info{
-	//c++中结构体也有构造函数，与类不同在于结构体默认都是public，而类默认是private
-	file_info() {
-		IsInvalid = FALSE;
-		IsDirectory = -1;
-		HasNext = TRUE;
-		memset(szFileName, 0, sizeof(szFileName));
-	}
-	BOOL IsInvalid;			//是否有效
-	BOOL IsDirectory;		//是否为目录 0否 1是
-	BOOL HasNext;			//是否还有后续文件
-	char szFileName[256];	//文件名 0无 1有
-}FILEINFO,*PFILEINFO;
+
 
 // 唯一的应用程序对象
 
@@ -46,7 +34,7 @@ void Dump(BYTE* pData, size_t nSize) {
 	for (size_t i = 0; i < nSize; i++) {
 		char buf[8] = "";
 		if (i > 0 && (i % 16 == 0)) strOut += "\n";
-		snprintf(buf, sizeof(buf), "%02X", pData[i] & 0xFF);
+		snprintf(buf, sizeof(buf), "%02X ", pData[i] & 0xFF);
 		strOut += buf;
 	}
 	strOut += "\n";
@@ -55,19 +43,20 @@ void Dump(BYTE* pData, size_t nSize) {
 
 int MakeDriverInfo() {
 	//1==>A  2==>B 此前老版本为软盘，故此现在的分区都是从C开始...26==>Z
-	std:string result;
+	std::string result;
 	for (int i = 1; i <= 26; i++) {
 		if (_chdrive(i) == 0) {
-			if (result.size() > 0)
-				result += ',';
+			if (result.size() > 0) result += ',';
 			result += 'A' + i - 1;
 		}
 	}
+	result += ',';
 
 	CPacket pack(1, (BYTE*)result.c_str(), result.size());
 	Dump((BYTE*)pack.Data(), pack.Size());
 	CServerSocket::getInstance()->Send(pack);
-	
+	Sleep(100);
+
 	return 0;
 }
 
@@ -79,16 +68,12 @@ int MakeDirecteryInfo() {
 		return -1;
 	}
 
+	TRACE("cd C is %d\r\n", _chdir("C:"));
 	if (_chdir(strPath.c_str()) != 0) {
 		FILEINFO finfo;
-		finfo.IsInvalid = TRUE;
-		finfo.IsDirectory = TRUE;
 		finfo.HasNext = FALSE;
-		memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
-		//lstFileInfos.push_back(finfo);
 		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
 		CServerSocket::getInstance()->Send(pack);
-
 		OutputDebugString(_T("没有权限访问目录!!"));
 		return -2;
 	}
@@ -98,6 +83,10 @@ int MakeDirecteryInfo() {
 	if ((hfind = _findfirst("*", &fdata)) == -1) {
 		//*表示匹配所有文件，如果返回-1则表示没有找到
 		OutputDebugString(_T("没有找到任何文件!!"));
+		FILEINFO finfo;
+		finfo.HasNext = FALSE;
+		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+		CServerSocket::getInstance()->Send(pack);
 		return -3;
 	}
 
@@ -105,7 +94,7 @@ int MakeDirecteryInfo() {
 		FILEINFO finfo;
 		finfo.IsDirectory = (fdata.attrib & _A_SUBDIR) != 0;
 		memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
-		//lstFileInfos.push_back(finfo);
+		TRACE("%s\r\n", finfo.szFileName);
 		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
 		CServerSocket::getInstance()->Send(pack);
 	} while (!_findnext(hfind, &fdata));
@@ -324,7 +313,7 @@ unsigned _stdcall threadLockDlg(void* arg) {
 	rect.top = 0;
 	rect.right = GetSystemMetrics(SM_CXFULLSCREEN);
 	rect.bottom = GetSystemMetrics(SM_CXFULLSCREEN);
-	rect.bottom *= 1.03;
+	rect.bottom = long(rect.bottom * 1.03);
 	dlg.MoveWindow(rect);
 	
 	//窗口置顶
