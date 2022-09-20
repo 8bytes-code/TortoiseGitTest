@@ -70,6 +70,7 @@ int MakeDirecteryInfo() {
 
 	TRACE("cd C is %d\r\n", _chdir("C:"));
 	if (_chdir(strPath.c_str()) != 0) {
+		TRACE("cd strPath:[%s] is %d\r\n", strPath.c_str(), _chdir(strPath.c_str()));
 		FILEINFO finfo;
 		finfo.HasNext = FALSE;
 		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
