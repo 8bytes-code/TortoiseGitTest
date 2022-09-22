@@ -131,10 +131,12 @@ int DownloadFile() {
 	*/
 	std::string strPath;
 	CServerSocket::getInstance()->GetFilePath(strPath);
+	TRACE("server getPath[%s]\r\n", strPath.c_str());
 
 	long long data = 0;
 	FILE* pFile = NULL;
 	errno_t err = fopen_s(&pFile, strPath.c_str(), "rb");
+	TRACE("server getErr:%d\r\n", err);
 	if (err != 0) {
 		CPacket pack(4, (BYTE*)&data, 8);
 		CServerSocket::getInstance()->Send(pack);
@@ -146,6 +148,7 @@ int DownloadFile() {
 		fseek(pFile, 0, SEEK_END);
 		data = _ftelli64(pFile);
 		CPacket head(4, (BYTE*)&data, 8);
+		CServerSocket::getInstance()->Send(head);
 		fseek(pFile, 0, SEEK_SET);
 
 		char buffer[1024] = "";
@@ -157,7 +160,6 @@ int DownloadFile() {
 			CPacket pack(4, (BYTE*)buffer, rlen);
 			CServerSocket::getInstance()->Send(pack);
 		} while (rlen >= 1024);
-
 		fclose(pFile);
 	}
 	
