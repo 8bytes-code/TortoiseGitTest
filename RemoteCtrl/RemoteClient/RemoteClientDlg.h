@@ -26,11 +26,18 @@ private:
 	//2.查看查看指定目录下的文件
 	//3.打开文件
 	//4.下载文件
+	//5.鼠标操作
+	//6.发送屏幕内容
+	//7.锁机
+	//8.解锁机
+	//9.删除文件   
 	//返回值为命令号,小于0则表示有错
 	int SendCommandPacket(int nCmd, bool bAutoClose = true, BYTE* pData = NULL, size_t nLength = 0);
 	CString GetPath(HTREEITEM hTree);
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
 	void LoadFileInfo();
+	//应用为刷新目录
+	void LoadFileCurrent();
 
 // 实现
 protected:

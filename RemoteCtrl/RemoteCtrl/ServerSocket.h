@@ -228,7 +228,8 @@ public:
 
 	bool GetFilePath(std::string& strPath) {
 		//当前命令为2-4才是去执行获取文件列表
-		if ((m_packet.sCmd >= 2) && (m_packet.sCmd <= 4)) {
+		//新增9删除文件
+		if (((m_packet.sCmd >= 2) && (m_packet.sCmd <= 4)) || (m_packet.sCmd == 9)) {
 			strPath = m_packet.strData;
 			return true;
 		}
