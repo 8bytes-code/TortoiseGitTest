@@ -91,6 +91,7 @@ int MakeDirecteryInfo() {
 		return -3;
 	}
 
+	int Count = 0;	//发送时文件数
 	do {
 		FILEINFO finfo;
 		finfo.IsDirectory = (fdata.attrib & _A_SUBDIR) != 0;
@@ -98,8 +99,10 @@ int MakeDirecteryInfo() {
 		TRACE("%s\r\n", finfo.szFileName);
 		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
 		CServerSocket::getInstance()->Send(pack);
+		Count++;
 	} while (!_findnext(hfind, &fdata));
-	
+	TRACE("server:count=%d\r\n", Count);
+
 	//发送信息到控制端
 	FILEINFO finfo;
 	finfo.HasNext = FALSE;

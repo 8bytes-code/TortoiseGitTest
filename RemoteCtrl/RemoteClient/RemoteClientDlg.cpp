@@ -266,6 +266,7 @@ void CRemoteClientDlg::LoadFileInfo() {
 	int nCmd = SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
 	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	CClientSocket* pClient = CClientSocket::getInstance();
+	int Count = 0;	//接受统计文件数
 	while (pInfo->HasNext) {
 		TRACE("[%s] isdir:%d\r\n", pInfo->szFileName, pInfo->IsDirectory);
 		if (pInfo->IsDirectory) {
@@ -284,13 +285,13 @@ void CRemoteClientDlg::LoadFileInfo() {
 			//文件插入到列表中
 			m_List.InsertItem(0, pInfo->szFileName);
 		}
-
+		Count++;
 		int cmd = pClient->DealCommand();
 		TRACE("ack:%d\r\n", cmd);
 		if (cmd < 0) break;
 		pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	}
-
+	TRACE("Client:Count=%d\r\n", Count);
 	//最后手动关闭
 	pClient->CloseSocket();
 }
@@ -409,7 +410,7 @@ void CRemoteClientDlg::OnDownloadFile() {
 		pClient->CloseSocket();
 		AfxMessageBox("下载完毕!");
 	}
-	
+	//TODO:大文件传输需要做针对性处理
 }
 
 
@@ -425,7 +426,7 @@ void CRemoteClientDlg::OnDeleteFile() {
 	if (ret < 0) {
 		AfxMessageBox("删除文件命令失败!!!");
 	}
-	LoadFileCurrent();
+	LoadFileCurrent();	//TODO:刷新之后文件会有缺漏
 }
 
 
