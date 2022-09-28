@@ -406,43 +406,49 @@ void CRemoteClientDlg::threadEntryForWatchData(void* arg) {
 }
 
 void CRemoteClientDlg::threadWatchData() {
+	//线程起的稍微快了点
+	Sleep(50);
 	CClientSocket* pClient = NULL;
 	do {
 		pClient = CClientSocket::getInstance();
-	
-
-	} while (pClient != NULL);
+	} while (pClient == NULL);
 
 	for (;;) {
-		CPacket pack(6, NULL, 0);
-		bool ret = pClient->Send(pack);
-		if (ret) {
-			int cmd = pClient->DealCommand();
-			if (cmd == 6) {
-				//更新数据到缓存
-				if (m_isFull == false) {
-					BYTE* pData = (BYTE*)pClient->GetPacket().strData.c_str();
-					//数据存入CImage
-					HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
-					if (hMem == NULL) {
-						TRACE("内存不足!");
-						Sleep(1);
-						continue;
-					}
-					IStream* pStream = NULL;
-					HRESULT hRet = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
-					if (hRet == S_OK) {
-						ULONG length = 0;
-						pStream->Write(pData, pClient->GetPacket().strData.size(), &length);
-						LARGE_INTEGER bg = { 0 };
-						pStream->Seek(bg, STREAM_SEEK_SET, NULL);
-						m_image.Load(pStream);
-						m_isFull = true;
-					}
+		/*
+		* CPacket pack(6,NULL,0);
+		* bool ret = pClient->Send(pack);
+		* 此处弃用该做法：
+		* 1. 此处线程没有进行网络初始化，所以没法直接用
+		* 2. 而SendCommanPacket就会因为里面的Update导致bug
+		*/
 
-					
+		if (m_isFull == false) {
+			int ret = SendMessage(WM_SEND_PACKET, 6 << 1 | 1);
+			if (ret == 6) {
+				//更新数据到缓存
+				BYTE* pData = (BYTE*)pClient->GetPacket().strData.c_str();
+				//数据存入CImage
+				HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
+				if (hMem == NULL) {
+					TRACE("内存不足!");
+					Sleep(1);
+					continue;
 				}
-				
+				IStream* pStream = NULL;
+				HRESULT hRet = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
+				if (hRet == S_OK) {
+					ULONG length = 0;
+					pStream->Write(pData, pClient->GetPacket().strData.size(), &length);
+					LARGE_INTEGER bg = { 0 };
+					pStream->Seek(bg, STREAM_SEEK_SET, NULL);
+					m_image.Load(pStream);
+					//CString filePath = "..\\RemoteCtrl\\2022.png";
+					//m_image.Load(filePath);
+					m_isFull = true;
+				}
+			
+			} else {
+				Sleep(1);
 			}
 		} else {
 			Sleep(1);
@@ -531,16 +537,33 @@ void CRemoteClientDlg::OnOpenFile() {
 }
 
 LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParm) {
-	CString strFile = (LPCSTR)lParm;
-	int ret = SendCommandPacket(wParam >> 1, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
+	int ret = 0;
+	int cmd = wParam >> 1;
+	switch (cmd) {
+	case 4:
+		{
+			CString strFile = (LPCSTR)lParm;
+			ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
+		}
+		break;
+	case 6:
+		{
+			ret = SendCommandPacket(cmd, wParam & 1);
+		}
+		break;
+	default:
+		ret = -1;
+		break;
+	}
+	TRACE("watchPacket ret=%d\r\n", ret);
 	return ret;
 }
 
 
 void CRemoteClientDlg::OnBnClickedBtnStratWatch() {
-	_beginthread(CRemoteClientDlg::threadEntryForWatchData, 9, this);
 	//防手贱连续按,设计模态化对话框
 	CWatchDialog dlg(this);
+	_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
 	dlg.DoModal();
 }
 

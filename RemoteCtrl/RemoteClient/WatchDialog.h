@@ -11,7 +11,7 @@ class CWatchDialog : public CDialog
 public:
 	CWatchDialog(CWnd* pParent = nullptr);   // 标准构造函数
 	virtual ~CWatchDialog();
-
+	POINT old;
 // 对话框数据
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_DLG_WATCH };
@@ -24,4 +24,7 @@ protected:
 public:
 	virtual BOOL OnInitDialog();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	CStatic m_picture;
+	afx_msg void OnSize(UINT nType, int cx, int cy);
+	void ReSize();
 };

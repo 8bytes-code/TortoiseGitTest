@@ -276,7 +276,7 @@ int SendScreen() {
 
 	//创建窗口，按照获取的宽和高还有位宽
 	screen.Create(nWidth, nHeight, nBitPerPixel);
-	BitBlt(screen.GetDC(), 0, 0, 1920, 1020, hScreen, 0, 0, SRCCOPY);
+	BitBlt(screen.GetDC(), 0, 0, 2560, 1390, hScreen, 0, 0, SRCCOPY);
 	ReleaseDC(NULL, hScreen);
 
 	//DWORD tick = GetTickCount64();
@@ -288,20 +288,22 @@ int SendScreen() {
 	//测试时用的是图片文件，但是网络中需要转换成数据流发送
 	HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
 	if (hMem == NULL)return -1;
-	IStream* pstream = NULL;
-	HRESULT ret = CreateStreamOnHGlobal(hMem, TRUE, &pstream);
+	IStream* pStream = NULL;
+	HRESULT ret = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
 	if (ret == S_OK) {
-		screen.Save(pstream, Gdiplus::ImageFormatPNG);
+		screen.Save(pStream, Gdiplus::ImageFormatPNG);
 		LARGE_INTEGER bg = { 0 };
-		pstream->Seek(bg, STREAM_SEEK_SET, NULL);
+		pStream->Seek(bg, STREAM_SEEK_SET, NULL);
 		PBYTE pData = (PBYTE)GlobalLock(hMem);
 		SIZE_T nSize = GlobalSize(hMem);
-		CPacket pack(6, NULL, nSize);
-		GlobalLock(hMem);
+		CPacket pack(6, pData, nSize);
+		CServerSocket::getInstance()->Send(pack);
+		GlobalUnlock(hMem);
 	}
 
-	pstream->Release();
+	pStream->Release();
 	GlobalFree(hMem);
+	//screen.Save(_T("2022.png"), Gdiplus::ImageFormatPNG);
 	screen.ReleaseDC();
 	return 0;
 }

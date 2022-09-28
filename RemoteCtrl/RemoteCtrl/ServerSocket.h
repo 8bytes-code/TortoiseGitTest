@@ -48,7 +48,7 @@ public:
 			nSize = 0;
 			return;
 		}
-		nLength = *(WORD*)(pData + i); i += 4;
+		nLength = *(DWORD*)(pData + i); i += 4;
 		if (nLength + i > nSize) {		//包未完全接受，解析失败就返回
 			nSize = 0;
 			return;
@@ -72,7 +72,7 @@ public:
 			return;
 		}
 
-		//nSize = 0;
+		nSize = 0;
 	}
 	~CPacket() {}
 	CPacket& operator=(const CPacket& pack) {
@@ -179,7 +179,7 @@ public:
 		
 		return true;
 	}
-#define BUFFER_SIZE 4096
+#define BUFFER_SIZE 4096	//1024*1024*4扩大缓冲区
 	int DealCommand() {
 		if (m_client == -1)return -1;
 		//char buffer[1024] = "";
