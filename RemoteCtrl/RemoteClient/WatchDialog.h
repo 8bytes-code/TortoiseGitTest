@@ -36,7 +36,7 @@ public:
     afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 
 public:
-	//自定义
-	CPoint UserPointRemoteScreenPoint(CPoint& point);
+	//自定义，当窗口缩放在监控的时候坐标才需要转换，而鼠标消息在窗口中是不需要在进行缩放
+	CPoint UserPointRemoteScreenPoint(CPoint& point, bool isScreen = false);
 	afx_msg void OnStnClickedWatch();
 };

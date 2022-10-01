@@ -254,7 +254,7 @@ int MouseEvent() {
 				break;
 		}
 
-		CPacket pack(4, NULL, 0);
+		CPacket pack(5, NULL, 0);
 		CServerSocket::getInstance()->Send(pack);
 
 	} else {
@@ -276,7 +276,9 @@ int SendScreen() {
 
 	//创建窗口，按照获取的宽和高还有位宽
 	screen.Create(nWidth, nHeight, nBitPerPixel);
-	BitBlt(screen.GetDC(), 0, 0, 2560, 1390, hScreen, 0, 0, SRCCOPY);
+	//BitBlt(screen.GetDC(), 0, 0, 1920, 1020, hScreen, 0, 0, SRCCOPY);
+	//BitBlt(screen.GetDC(), 0, 0, 2560, 1360, hScreen, 0, 0, SRCCOPY);
+	BitBlt(screen.GetDC(), 0, 0, 2560, 1540, hScreen, 0, 0, SRCCOPY);
 	ReleaseDC(NULL, hScreen);
 
 	//DWORD tick = GetTickCount64();
