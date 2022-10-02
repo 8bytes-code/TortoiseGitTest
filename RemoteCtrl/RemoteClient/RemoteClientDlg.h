@@ -51,7 +51,8 @@ private:
 private:
 	//自定义缓存
 	CImage m_image;
-	bool m_isFull;	//校验缓存是否有数据，true有，false无
+	bool m_isFull;		//校验缓存是否有数据，true有，false无
+	bool m_isClosed;	//监视是否关闭
 public:
 	//为了别的类能够访问私有成员的缓存
 	bool isFull() const {

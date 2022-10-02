@@ -137,7 +137,8 @@ BOOL CRemoteClientDlg::OnInitDialog()
 
 	// TODO: 在此添加额外的初始化代码
 	UpdateData();
-	m_server_address = 0x7F000001;	//127.0.0.1
+	//m_server_address = 0x7F000001;	//127.0.0.1
+	m_server_address = 0xc0a80a68;	//192.168.10.104虚拟机ip
 	m_nPort = _T("9527");
 	UpdateData(FALSE);
 	//状态对话框
@@ -413,7 +414,8 @@ void CRemoteClientDlg::threadWatchData() {
 		pClient = CClientSocket::getInstance();
 	} while (pClient == NULL);
 
-	for (;;) {
+	//for (;;) 
+	while (!m_isClosed) {
 		/*
 		* CPacket pack(6,NULL,0);
 		* bool ret = pClient->Send(pack);
@@ -441,9 +443,9 @@ void CRemoteClientDlg::threadWatchData() {
 					pStream->Write(pData, pClient->GetPacket().strData.size(), &length);
 					LARGE_INTEGER bg = { 0 };
 					pStream->Seek(bg, STREAM_SEEK_SET, NULL);
+					if ((HBITMAP)m_image != NULL)
+						m_image.Destroy();
 					m_image.Load(pStream);
-					//CString filePath = "..\\RemoteCtrl\\2022.png";
-					//m_image.Load(filePath);
 					m_isFull = true;
 				}
 			
@@ -566,10 +568,12 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParm) {
 
 
 void CRemoteClientDlg::OnBnClickedBtnStratWatch() {
-	//防手贱连续按,设计模态化对话框
+	m_isClosed = false;
 	CWatchDialog dlg(this);
-	_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
+	HANDLE hThread = (HANDLE)_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
 	dlg.DoModal();
+	m_isClosed = true;
+	WaitForSingleObject(hThread, 500);
 }
 
 

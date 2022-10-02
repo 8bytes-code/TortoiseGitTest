@@ -161,7 +161,7 @@ public:
 		sockaddr_in serv_adr;
 		memset(&serv_adr, 0, sizeof(serv_adr));
 		serv_adr.sin_family = AF_INET;
-		TRACE("addr:%08X nIP:08X\r\n", inet_addr("127.0.0.1"), nIP);
+		//TRACE("addr:%08X nIP:08X\r\n", inet_addr("127.0.0.1"), nIP);
 		serv_adr.sin_addr.s_addr = htonl(nIP);	//需要转换，否则顺序倒置
 		serv_adr.sin_port = htons(nPort);
 
