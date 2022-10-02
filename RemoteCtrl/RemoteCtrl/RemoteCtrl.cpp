@@ -209,6 +209,7 @@ int MouseEvent() {
 				break;
 			default:break;
 		}
+		TRACE("mouse event: %08X x%d y %d\r\n", nFlags, mouse.ptXY.x, mouse.ptXY.y);
 		switch (nFlags) {
 			case 0x21:	//左键双击
 				mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
@@ -234,20 +235,20 @@ int MouseEvent() {
 				mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
 				break;
 			case 0x82:	//右键松开
-				mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
+				mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
 				break;
 			case 0x24:	//中键双击
 				mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
 				mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
 			case 0x14:	//中键单击
-				mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
-				mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+				mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
+				mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
 				break;
 			case 0x44:	//中键按下
-				mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
+				mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
 				break;
 			case 0x84:	//中键松开
-				mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+				mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
 				break;
 			case 0x08:	//单纯的鼠标移动
 				mouse_event(MOUSEEVENTF_MOVE, mouse.ptXY.x, mouse.ptXY.y, 0, GetMessageExtraInfo());
@@ -320,17 +321,30 @@ unsigned _stdcall threadLockDlg(void* arg) {
 	rect.left = 0;
 	rect.top = 0;
 	rect.right = GetSystemMetrics(SM_CXFULLSCREEN);
-	rect.bottom = GetSystemMetrics(SM_CXFULLSCREEN);
-	rect.bottom = long(rect.bottom * 1.03);
+	rect.bottom = GetSystemMetrics(SM_CYFULLSCREEN);
+	rect.bottom = LONG(rect.bottom * 1.10);
 	dlg.MoveWindow(rect);
 	
+	//将字体稍微调整至中间
+	CWnd* pText = dlg.GetDlgItem(IDC_STATIC);
+	if (pText) {
+		CRect rtText;
+		pText->GetWindowRect(rtText);
+		int nWidth = rtText.Width();
+		int x = (rect.right - nWidth) / 2;
+		int nHeight = rtText.Height();
+		int y = (rect.bottom - nHeight) / 2;
+		pText->MoveWindow(x, y, rtText.Width(), rtText.Height());
+	}
+
 	//窗口置顶
 	dlg.SetWindowPos(&dlg.wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
 	//隐藏鼠标
 	ShowCursor(false);
 	//隐藏任务栏
 	::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_HIDE);
-
+	
+	dlg.GetWindowRect(rect);
 	rect.left = 0;
 	rect.top = 0;
 	rect.right = 1;
@@ -348,10 +362,11 @@ unsigned _stdcall threadLockDlg(void* arg) {
 			}
 		}
 	}
+	ClipCursor(NULL);
 	ShowCursor(true);
 	::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_SHOW);
 	dlg.DestroyWindow();
-	_endthread();
+	_endthreadex(0);
 
 	return 0;
 }
@@ -371,7 +386,7 @@ int LockMachine() {
 int UnlockMachine() {
 	//dlg.SendMessage(WM_KEYDOWN, 0x41, 0x01E0001);
 	PostThreadMessage(threadid, WM_KEYDOWN, 0x41, 0);
-	CPacket pack(7, NULL, 0);
+	CPacket pack(8, NULL, 0);
 	CServerSocket::getInstance()->Send(pack);
 
 	return 0;
