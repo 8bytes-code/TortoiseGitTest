@@ -79,8 +79,6 @@ protected:
 		return true;
 	}
 
-
-
 	bool AcceptClient() {
 		sockaddr_in client_adr;
 		int cli_sz = sizeof(client_adr);
@@ -89,7 +87,8 @@ protected:
 		
 		return true;
 	}
-#define BUFFER_SIZE 4096	//1024*1024*4扩大缓冲区
+
+#define BUFFER_SIZE 4096	
 	int DealCommand() {
 		if (m_client == -1)return -1;
 		//char buffer[1024] = "";
@@ -134,29 +133,6 @@ protected:
 		if (m_client == -1)return false;
 		//Dump((BYTE*)pack.Data(), pack.Size());
 		return send(m_client, pack.Data(), pack.Size(), 0) > 0;
-	}
-
-	bool GetFilePath(std::string& strPath) {
-		//当前命令为2-4才是去执行获取文件列表
-		//新增9删除文件
-		if (((m_packet.sCmd >= 2) && (m_packet.sCmd <= 4)) || (m_packet.sCmd == 9)) {
-			strPath = m_packet.strData;
-			return true;
-		}
-		return false;
-	}
-
-	bool GetMouseEvent(MOUSEEV& mouse) {
-		if (m_packet.sCmd == 5) {
-			memcpy(&mouse, m_packet.strData.c_str(), sizeof(MOUSEEV));
-			return true;
-		}
-
-		return false;
-	}
-
-	CPacket& GetPacket() {
-		return m_packet;
 	}
 
 	void CloseClient() {

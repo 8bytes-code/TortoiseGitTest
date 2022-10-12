@@ -143,13 +143,13 @@ protected:
 			size_t rlen = 0;
 			do {
 				rlen = fread(buffer, 1, 1024, pFile);				//每次读1字节，读1024次
-				lstPacket.push_back(CPacket(4, (BYTE*)&data, 8));	//读到之后发送
+				lstPacket.push_back(CPacket(4, (BYTE*)&buffer, rlen));	//读到之后发送
 			} while (rlen >= 1024);
 			fclose(pFile);
+		} else {
+			//循环发送完后最后是空代表结束
+			lstPacket.push_back(CPacket(4, NULL, 0));
 		}
-
-		//循环发送完后最后是空代表结束
-		lstPacket.push_back(CPacket(4, NULL, 0));
 
 		return 0;
 	}
