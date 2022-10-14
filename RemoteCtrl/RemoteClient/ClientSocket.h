@@ -190,7 +190,9 @@ public:
 
 		while (true) {
 			size_t len = recv(m_sock, buffer + index, BUFFER_SIZE - index, 0);
-			if ((len <= 0) && (index <= 0)) {
+			//修补，因为size_t原型是unsigned int，无符号故此-1的时候溢出变成
+			//但因为包设计不能大改，只能在if的时候强转了
+			if (((int)len <= 0) && ((int)index <= 0)) {
 				return -1;
 			}
 			//TRACE("recv:%d\r\n", len);

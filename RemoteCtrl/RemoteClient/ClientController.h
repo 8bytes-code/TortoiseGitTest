@@ -1,6 +1,3 @@
-/*
-* mvc设计-c·控制层
-*/
 #pragma once
 #include "ClientSocket.h"
 #include "WatchDialog.h"
@@ -55,48 +52,14 @@ public:
 	//8.解锁机
 	//9.删除文件   
 	//返回值为命令号,小于0则表示有错
-	int SendCommandPacket(int nCmd, bool bAutoClose = true, BYTE* pData = NULL, size_t nLength = 0) {
-		CClientSocket* pClient = CClientSocket::getInstance();
-		if (pClient->InitSocket() == false)return false;
-		pClient->Send(CPacket(nCmd, pData, nLength));
-		int cmd = DealCommand();
-		TRACE("SendCommandPack cmd:%d\r\n", cmd);
-		if (bAutoClose)
-			CloseSocket();
-		return cmd;
-	}
+	int SendCommandPacket(int nCmd, bool bAutoClose = true, BYTE* pData = NULL, size_t nLength = 0);
 
 	int GetImage(CImage& image) {
 		CClientSocket* pClient = CClientSocket::getInstance();
 		return CHeTool::BytesToImage(image, pClient->GetPacket().strData);
 	}
 
-	int DownFile(CString strPath) {
-		CFileDialog dlg(FALSE, NULL, strPath,
-		OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
-		NULL, &m_remoteDlg);	//构造起来有点麻烦
-
-		if (dlg.DoModal() == IDOK) {
-			m_strRemote = strPath;
-			m_strLocal = dlg.GetPathName();
-			//获取线程，以免强制关闭
-			m_hThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
-			//通过等待信号判断线程是否成功创建
-			if (WaitForSingleObject(m_hThreadDownload, 0) == WAIT_TIMEOUT) {
-				return -1;
-			}
-			
-			//让光标进入等待状态
-			m_remoteDlg.BeginWaitCursor();
-
-			m_statusDlg.m_info.SetWindowText(_T("命令正在执行中！"));
-			m_statusDlg.ShowWindow(SW_SHOW);
-			m_statusDlg.CenterWindow(&m_remoteDlg);
-			m_statusDlg.SetActiveWindow();
-		}
-
-		return 0;
-	}
+	int DownFile(CString strPath);
 
 	void StartWatchScreen();
 protected:
@@ -182,7 +145,7 @@ private:
 	class CHelper {
 	public:
 		CHelper() {
-			CClientController::getInstance();
+			//CClientController::getInstance();
 		}
 		~CHelper() {
 			CClientController::releaseInstance();

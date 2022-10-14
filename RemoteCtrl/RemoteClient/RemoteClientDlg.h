@@ -6,7 +6,6 @@
 #include "ClientSocket.h"
 #include "StatusDlg.h"
 
-#define WM_SEND_PACKET (WM_USER + 1)	//发送数据包的消息
 
 // CRemoteClientDlg 对话框
 class CRemoteClientDlg : public CDialogEx
@@ -34,19 +33,13 @@ private:
 private:
 	//自定义缓存
 	CImage m_image;
-	bool m_isFull;		//校验缓存是否有数据，true有，false无
 	bool m_isClosed;	//监视是否关闭
 public:
 	//为了别的类能够访问私有成员的缓存
-	bool isFull() const {
-		return m_isFull;
-	}
 	CImage& GetImage() {
 		return m_image;
 	}
-	void SetImageStatus(bool isFull = false) {
-		m_isFull = isFull;
-	}
+
 
 // 实现
 protected:
@@ -73,7 +66,6 @@ public:
     afx_msg void OnDownloadFile();
 	afx_msg void OnDeleteFile();
 	afx_msg void OnOpenFile();
-	afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParm);
 	afx_msg void OnBnClickedBtnStratWatch();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnIpnFieldchangedIpaddressServ(NMHDR* pNMHDR, LRESULT* pResult);

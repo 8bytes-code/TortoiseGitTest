@@ -82,7 +82,6 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_COMMAND(ID_DOWNLOAD_FILE, &CRemoteClientDlg::OnDownloadFile)	//WM_COMMAND
 	ON_COMMAND(ID_DELETE_FILE, &CRemoteClientDlg::OnDeleteFile)	//WM_COMMAND
 	ON_COMMAND(ID_OPEN_FILE, &CRemoteClientDlg::OnOpenFile)	//WM_COMMAND
-	ON_MESSAGE(WM_SEND_PACKET, &CRemoteClientDlg::OnSendPacket)		//自定义注册消息
 	ON_BN_CLICKED(IDC_BTN_STRAT_WATCH, &CRemoteClientDlg::OnBnClickedBtnStratWatch)	//WM_COMMAND
 	ON_WM_TIMER()
 	ON_NOTIFY(IPN_FIELDCHANGED, IDC_IPADDRESS_SERV, &CRemoteClientDlg::OnIpnFieldchangedIpaddressServ)
@@ -133,8 +132,6 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	//状态对话框
 	m_dlgStatus.Create(IDD_DLG_STATUS, this);
 	m_dlgStatus.ShowWindow(SW_HIDE);
-	//缓存状态
-	m_isFull = false;
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -401,36 +398,6 @@ void CRemoteClientDlg::OnOpenFile() {
 	}
 }
 
-LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParm) {
-	int ret = 0;
-	int cmd = wParam >> 1;
-	switch (cmd) {
-	case 4:
-		{
-			CString strFile = (LPCSTR)lParm;
-			ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
-		}
-		break;
-	case 5:	//鼠标操作
-		{
-			ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1, (BYTE*)lParm, sizeof(MOUSEEV));
-		}
-		break;
-	case 6:
-	case 7:
-	case 8:
-		{
-			ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1);
-		}
-		break;
-	default:
-		ret = -1;
-		break;
-	}
-	TRACE("watchPacket ret=%d\r\n", ret);
-	return ret;
-}
-
 
 void CRemoteClientDlg::OnBnClickedBtnStratWatch() {
 	CClientController::getInstance()->StartWatchScreen();
@@ -439,16 +406,13 @@ void CRemoteClientDlg::OnBnClickedBtnStratWatch() {
 
 void CRemoteClientDlg::OnTimer(UINT_PTR nIDEvent) {
 	// TODO: 在此添加消息处理程序代码和/或调用默认值
-
 	CDialogEx::OnTimer(nIDEvent);
 }
 
 //将控件的更新写入到事件中
 void CRemoteClientDlg::OnIpnFieldchangedIpaddressServ(NMHDR* pNMHDR, LRESULT* pResult) {
 	LPNMIPADDRESS pIPAddr = reinterpret_cast<LPNMIPADDRESS>(pNMHDR);
-	// TODO: 在此添加控件通知处理程序代码
 	*pResult = 0;
-	
 	UpdateData();
 	CClientController* pController = CClientController::getInstance();
 	pController->UpdateAddress(m_server_address, atoi((LPCTSTR)m_nPort));

@@ -18,7 +18,6 @@ public:
 #endif
 
 protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
 
 	DECLARE_MESSAGE_MAP()
 public:
@@ -44,4 +43,14 @@ public:
 	virtual void OnOK();
 	afx_msg void OnBnClickedBtnLock();
 	afx_msg void OnBnClickedBtnUnlock();
+
+	bool m_isFull;		//校验缓存是否有数据，true有，false无
+	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
+	void SetImageStatus(bool isFull = false) {
+		m_isFull = isFull;
+	}
+
+	bool isFull() const {
+		return m_isFull;
+	}
 };
