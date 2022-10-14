@@ -9,6 +9,7 @@
 #include "afxdialogex.h"
 #include "ClientSocket.h"
 #include "WatchDialog.h"
+#include "ClientController.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -33,6 +34,8 @@ public:
 // 实现
 protected:
 	DECLARE_MESSAGE_MAP()
+public:
+	
 };
 
 CAboutDlg::CAboutDlg() : CDialogEx(IDD_ABOUTBOX)
@@ -67,25 +70,6 @@ void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_LIST_FILE, m_List);
 }
 
-int CRemoteClientDlg::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData, size_t nLength) {
-	UpdateData();
-	CClientSocket* pClient = CClientSocket::getInstance();
-	bool ret = pClient->InitSocket(m_server_address, atoi((LPCTSTR)m_nPort));		//需要增加返回值处理
-	if (!ret) {
-		AfxMessageBox("网络初始化失败!");
-		return -1;
-	}
-
-	CPacket pack(nCmd, pData, nLength);
-	ret = pClient->Send(pack);
-	TRACE("Send ret:%d\r\n", ret);
-	int cmd = pClient->DealCommand();
-	TRACE("ack:%d\r\n", cmd);
-	if(bAutoClose) 
-		pClient->CloseSocket();
-	return cmd;
-}
-
 BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
@@ -101,6 +85,8 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_MESSAGE(WM_SEND_PACKET, &CRemoteClientDlg::OnSendPacket)		//自定义注册消息
 	ON_BN_CLICKED(IDC_BTN_STRAT_WATCH, &CRemoteClientDlg::OnBnClickedBtnStratWatch)	//WM_COMMAND
 	ON_WM_TIMER()
+	ON_NOTIFY(IPN_FIELDCHANGED, IDC_IPADDRESS_SERV, &CRemoteClientDlg::OnIpnFieldchangedIpaddressServ)
+	ON_EN_CHANGE(IDC_EDIT_PORT, &CRemoteClientDlg::OnEnChangeEditPort)
 END_MESSAGE_MAP()
 
 
@@ -142,6 +128,8 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	m_server_address = 0xc0a80068;		//192.168.0.104
 	m_nPort = _T("9527");
 	UpdateData(FALSE);
+	CClientController* pController = CClientController::getInstance();
+	pController->UpdateAddress(m_server_address, atoi((LPCTSTR)m_nPort));
 	//状态对话框
 	m_dlgStatus.Create(IDD_DLG_STATUS, this);
 	m_dlgStatus.ShowWindow(SW_HIDE);
@@ -203,15 +191,13 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 
 
 void CRemoteClientDlg::OnBnClickedBtnTest() {
-	// TODO: 在此添加控件通知处理程序代码
-	SendCommandPacket(1981);
-
+	CClientController::getInstance()->SendCommandPacket(1981);
 }
 
 
 void CRemoteClientDlg::OnBnClickedBtnFileinfo() {
 	// TODO: 在此添加控件通知处理程序代码
-	int ret = SendCommandPacket(1);
+	int ret = CClientController::getInstance()->SendCommandPacket(1);
 	if (ret == -1) {
 		AfxMessageBox(_T("命令处理失败!!"));
 		return;
@@ -274,7 +260,7 @@ void CRemoteClientDlg::LoadFileInfo() {
 	DeleteTreeChildrenItem(hTreeSelected);
 	m_List.DeleteAllItems();
 	CString strPath = GetPath(hTreeSelected);
-	int nCmd = SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
+	int nCmd = CClientController::getInstance()->SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
 	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	CClientSocket* pClient = CClientSocket::getInstance();
 	int Count = 0;	//接受统计文件数
@@ -313,9 +299,8 @@ void CRemoteClientDlg::LoadFileCurrent() {
 	//清空列表
 	m_List.DeleteAllItems();
 
-	int nCmd = SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
+	int nCmd = CClientController::getInstance()->SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
 	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
-	CClientSocket* pClient = CClientSocket::getInstance();
 	while (pInfo->HasNext) {
 		TRACE("[%s] isdir:%d\r\n", pInfo->szFileName, pInfo->IsDirectory);
 		if (!pInfo->IsDirectory) {
@@ -323,141 +308,16 @@ void CRemoteClientDlg::LoadFileCurrent() {
 			m_List.InsertItem(0, pInfo->szFileName);
 		}
 
-		int cmd = pClient->DealCommand();
+		int cmd = CClientController::getInstance()->DealCommand();
 		TRACE("ack:%d\r\n", cmd);
 		if (cmd < 0) break;
 		pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	}
 
 	//最后手动关闭
-	pClient->CloseSocket();
+	CClientController::getInstance()->CloseSocket();
 }
 
-void CRemoteClientDlg::threadEntryForDownFile(void* arg) {
-	CRemoteClientDlg* thiz = (CRemoteClientDlg*)arg;
-	thiz->threadDownFile();
-	_endthread();
-}
-
-void CRemoteClientDlg::threadDownFile() {
-	int nListSelected = m_List.GetSelectionMark();
-	//获取当前选中的文件名
-	CString strFile = m_List.GetItemText(nListSelected, 0);
-
-	CFileDialog dlg(FALSE, NULL,
-		m_List.GetItemText(nListSelected, 0),
-		OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
-		NULL, this);	//构造起来有点麻烦
-
-	if (dlg.DoModal() == IDOK) {	//选择取消则不进行后面的处理
-		FILE* pFile = fopen(dlg.GetPathName(), "wb+");
-		if (pFile == NULL) {
-			AfxMessageBox(_T("本地没有权限保存该文件或者文件无法创建!!!"));
-			m_dlgStatus.ShowWindow(SW_HIDE);
-			EndWaitCursor();		//让光标结束等待状态
-			return;
-		}
-
-		//获取当前左边选中的文件夹，用于得到文件坐在路径
-		HTREEITEM hSelected = m_Tree.GetSelectedItem();
-		strFile = GetPath(hSelected) + strFile;
-		TRACE("DownFile path[%s]\r\n", LPCTSTR(strFile));
-		CClientSocket* pClient = CClientSocket::getInstance();
-
-		do {
-			//下载文件指令为4
-			//int ret = SendCommandPacket(4, false, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
-			int ret = SendMessage(WM_SEND_PACKET, 4 << 1 | 0, (LPARAM)(LPCSTR)strFile);
-			if (ret < 0) {
-				AfxMessageBox("执行下载命令失败");
-				TRACE("下载文件失败:ret=%d\r\n", ret);
-				break;
-			}
-
-			long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
-			if (nLength == 0) {
-				AfxMessageBox("文件长度为0或者无法读取文件!!!");
-				break;
-			}
-			long long nCount = 0;
-			while (nCount < nLength) {
-				ret = pClient->DealCommand();
-				if (ret < 0) {
-					AfxMessageBox("传输失败");
-					TRACE("文件传输失败:ret=%d\r\n", ret);
-					break;
-				}
-				fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().strData.size(), pFile);
-				nCount += pClient->GetPacket().strData.size();
-			}
-
-		} while (false);
-		fclose(pFile);
-		pClient->CloseSocket();
-		//AfxMessageBox("下载完毕!");
-	}
-	m_dlgStatus.ShowWindow(SW_HIDE);
-	EndWaitCursor();		//让光标结束等待状态
-	MessageBox(_T("下载完成!!"), _T("完成"));
-}
-
-void CRemoteClientDlg::threadEntryForWatchData(void* arg) {
-	CRemoteClientDlg* thiz = (CRemoteClientDlg*)arg;
-	thiz->threadWatchData();
-	_endthread();
-}
-
-void CRemoteClientDlg::threadWatchData() {
-	//线程起的稍微快了点
-	Sleep(50);
-	CClientSocket* pClient = NULL;
-	do {
-		pClient = CClientSocket::getInstance();
-	} while (pClient == NULL);
-
-	//for (;;) 
-	while (!m_isClosed) {
-		/*
-		* CPacket pack(6,NULL,0);
-		* bool ret = pClient->Send(pack);
-		* 此处弃用该做法：
-		* 1. 此处线程没有进行网络初始化，所以没法直接用
-		* 2. 而SendCommanPacket就会因为里面的Update导致bug
-		*/
-
-		if (m_isFull == false) {
-			int ret = SendMessage(WM_SEND_PACKET, 6 << 1 | 1);
-			if (ret == 6) {
-				//更新数据到缓存
-				BYTE* pData = (BYTE*)pClient->GetPacket().strData.c_str();
-				//数据存入CImage
-				HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
-				if (hMem == NULL) {
-					TRACE("内存不足!");
-					Sleep(1);
-					continue;
-				}
-				IStream* pStream = NULL;
-				HRESULT hRet = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
-				if (hRet == S_OK) {
-					ULONG length = 0;
-					pStream->Write(pData, pClient->GetPacket().strData.size(), &length);
-					LARGE_INTEGER bg = { 0 };
-					pStream->Seek(bg, STREAM_SEEK_SET, NULL);
-					if ((HBITMAP)m_image != NULL)
-						m_image.Destroy();
-					m_image.Load(pStream);
-					m_isFull = true;
-				}
-			
-			} else {
-				Sleep(1);
-			}
-		} else {
-			Sleep(1);
-		}
-	}
-}
 
 //左键双击事件
 void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult) {
@@ -495,16 +355,18 @@ void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult) {
 
 
 void CRemoteClientDlg::OnDownloadFile() {
+	int nListSelected = m_List.GetSelectionMark();
+	//获取当前选中的文件名
+	CString strFile = m_List.GetItemText(nListSelected, 0);
+	//获取当前左边选中的文件夹，用于得到文件坐在路径
+	HTREEITEM hSelected = m_Tree.GetSelectedItem();
+	strFile = GetPath(hSelected) + strFile;
+	int ret = CClientController::getInstance()->DownFile(strFile);
 
-	//TODO:大文件传输需要做针对性处理
-	//进行线程优化部分
-	_beginthread(CRemoteClientDlg::threadEntryForDownFile, 0, this);
-	BeginWaitCursor();		//让光标进入等待状态
-	m_dlgStatus.m_info.SetWindowText(_T("命令正在执行中！"));
-	m_dlgStatus.ShowWindow(SW_SHOW);
-	m_dlgStatus.CenterWindow(this);
-	m_dlgStatus.SetActiveWindow();
-	//Sleep(50);
+	if (ret != 0) {
+		MessageBox(_T("下载文件失败！"));
+		TRACE("downfile ret=%d\r\n", ret);
+	}
 }
 
 
@@ -516,7 +378,7 @@ void CRemoteClientDlg::OnDeleteFile() {
 	CString strFile = m_List.GetItemText(nSelected, 0);
 	strFile = strPath + strFile;
 
-	int ret = SendCommandPacket(9, true, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
+	int ret = CClientController::getInstance()->SendCommandPacket(9, true, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
 	if (ret < 0) {
 		AfxMessageBox("删除文件命令失败!!!");
 	}
@@ -533,7 +395,7 @@ void CRemoteClientDlg::OnOpenFile() {
 	strFile = strPath + strFile;
 
 	//打开文件比较简单，程序就启动，文件就按照默认打开方式打开
-	int ret = SendCommandPacket(3, true, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
+	int ret = CClientController::getInstance()->SendCommandPacket(3, true, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
 	if (ret < 0) {
 		AfxMessageBox("打开文件命令失败!!!");
 	}
@@ -546,19 +408,19 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParm) {
 	case 4:
 		{
 			CString strFile = (LPCSTR)lParm;
-			ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
+			ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
 		}
 		break;
 	case 5:	//鼠标操作
 		{
-			ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)lParm, sizeof(MOUSEEV));
+			ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1, (BYTE*)lParm, sizeof(MOUSEEV));
 		}
 		break;
 	case 6:
 	case 7:
 	case 8:
 		{
-			ret = SendCommandPacket(cmd, wParam & 1);
+			ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1);
 		}
 		break;
 	default:
@@ -571,12 +433,7 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParm) {
 
 
 void CRemoteClientDlg::OnBnClickedBtnStratWatch() {
-	m_isClosed = false;
-	CWatchDialog dlg(this);
-	HANDLE hThread = (HANDLE)_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
-	dlg.DoModal();
-	m_isClosed = true;
-	WaitForSingleObject(hThread, 500);
+	CClientController::getInstance()->StartWatchScreen();
 }
 
 
@@ -584,4 +441,22 @@ void CRemoteClientDlg::OnTimer(UINT_PTR nIDEvent) {
 	// TODO: 在此添加消息处理程序代码和/或调用默认值
 
 	CDialogEx::OnTimer(nIDEvent);
+}
+
+//将控件的更新写入到事件中
+void CRemoteClientDlg::OnIpnFieldchangedIpaddressServ(NMHDR* pNMHDR, LRESULT* pResult) {
+	LPNMIPADDRESS pIPAddr = reinterpret_cast<LPNMIPADDRESS>(pNMHDR);
+	// TODO: 在此添加控件通知处理程序代码
+	*pResult = 0;
+	
+	UpdateData();
+	CClientController* pController = CClientController::getInstance();
+	pController->UpdateAddress(m_server_address, atoi((LPCTSTR)m_nPort));
+}
+
+
+void CRemoteClientDlg::OnEnChangeEditPort() {
+	UpdateData();
+	CClientController* pController = CClientController::getInstance();
+	pController->UpdateAddress(m_server_address, atoi((LPCTSTR)m_nPort));
 }

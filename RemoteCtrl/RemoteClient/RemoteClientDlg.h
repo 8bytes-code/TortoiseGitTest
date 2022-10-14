@@ -25,28 +25,11 @@ public:
 
 //自定义
 private:
-	//1.查看磁盘分区
-	//2.查看查看指定目录下的文件
-	//3.打开文件
-	//4.下载文件
-	//5.鼠标操作
-	//6.发送屏幕内容
-	//7.锁机
-	//8.解锁机
-	//9.删除文件   
-	//返回值为命令号,小于0则表示有错
-	int SendCommandPacket(int nCmd, bool bAutoClose = true, BYTE* pData = NULL, size_t nLength = 0);
 	CString GetPath(HTREEITEM hTree);
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
 	void LoadFileInfo();
 	//应用为刷新目录
 	void LoadFileCurrent();
-	//线程优化
-	static void threadEntryForDownFile(void* arg);
-	void threadDownFile();
-	//监控启用线程
-	static void threadEntryForWatchData(void* arg);
-	void threadWatchData();
 
 private:
 	//自定义缓存
@@ -93,4 +76,6 @@ public:
 	afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParm);
 	afx_msg void OnBnClickedBtnStratWatch();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg void OnIpnFieldchangedIpaddressServ(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnEnChangeEditPort();
 };
