@@ -28,16 +28,13 @@ void CClientSocket::threadEntry(void* arg) {
 }
 
 void CClientSocket::threadFunc() {
-	if (InitSocket() == false) {
-		return;
-	}
-
 	std::string strBuffer;
 	strBuffer.resize(BUFFER_SIZE);
 	char* pBuffer = (char*)strBuffer.c_str();
 	int index = 0;
 	while (m_sock != INVALID_SOCKET) {
 		if (m_lstSend.size() > 0) {
+			TRACE("lstSend size=%d\r\n", m_lstSend.size());
 			CPacket& head = m_lstSend.front();
 			if (Send(head) == false) {
 				TRACE("threadFunc Send Error!\r\n");
@@ -46,12 +43,11 @@ void CClientSocket::threadFunc() {
 			
 			auto pr = m_mapAck.insert(std::pair<HANDLE, std::list<CPacket>>(head.hEvent, std::list<CPacket>()));
 			std::list<CPacket> lstRecv;
-			int length = recv(m_sock, pBuffer, BUFFER_SIZE - index, 0);
+			int length = recv(m_sock, pBuffer + index, BUFFER_SIZE - index, 0);
 			if (length > 0 || index > 0) {
 				index += length;
 				size_t size = (size_t)index;
 				CPacket pack((BYTE*)pBuffer, size);
-				
 				
 				if (size > 0) {
 					pack.hEvent = head.hEvent;
@@ -64,4 +60,5 @@ void CClientSocket::threadFunc() {
 			m_lstSend.pop_front();
 		}
 	}
+	CloseSocket();
 }

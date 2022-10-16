@@ -7,8 +7,8 @@
 #include <map>
 #include "HeTool.h"
 
-#define WM_SEND_PACK (WM_USER+1)	//发送包数据消息
-#define WM_SEND_DATA (WM_USER+2)	//发送数据消息
+//#define WM_SEND_PACK (WM_USER+1)	//发送包数据消息
+//#define WM_SEND_DATA (WM_USER+2)	//发送数据消息
 #define WM_SHOW_STATUS (WM_USER+3)	//展示状态消息
 #define WM_SHOW_WATCH (WM_USER+4)	//远程监控消息
 #define WM_SEND_MESSAGE (WM_USER+0x1000) //自定义消息处理
@@ -36,11 +36,6 @@ public:
 		CClientSocket::getInstance()->CloseSocket();
 	}
 
-	bool SendPacket(const CPacket& pack) {
-		CClientSocket* pClient = CClientSocket::getInstance();
-		if (pClient->InitSocket() == false)return false;
-		pClient->Send(pack);
-	}
 
 	//1.查看磁盘分区
 	//2.查看查看指定目录下的文件
@@ -52,7 +47,13 @@ public:
 	//8.解锁机
 	//9.删除文件   
 	//返回值为命令号,小于0则表示有错
-	int SendCommandPacket(int nCmd, bool bAutoClose = true, BYTE* pData = NULL, size_t nLength = 0);
+	int SendCommandPacket(
+		int nCmd,
+		bool bAutoClose = true,
+		BYTE* pData = NULL,
+		size_t nLength = 0,
+		std::list<CPacket>* plstPacks = NULL
+	);
 
 	int GetImage(CImage& image) {
 		CClientSocket* pClient = CClientSocket::getInstance();
@@ -65,7 +66,7 @@ public:
 protected:
 	//监控线程
 	void threadWatchScreen();
-	static void threadWatchScreenE(void* arg);
+	static void threadWatchScreen(void* arg);
 	//下载文件线程
 	void threadDownloadFile();
 	static void threadDownloadEntry(void* arg);
@@ -96,8 +97,8 @@ protected:
 	}
 
 	//自定义消息响应函数声明
-	LRESULT OnSendPack(UINT nMsg, WPARAM wParam, LPARAM lParam);
-	LRESULT OnSendData(UINT nMsg, WPARAM wParam, LPARAM lParam);
+	//LRESULT OnSendPack(UINT nMsg, WPARAM wParam, LPARAM lParam);
+	//LRESULT OnSendData(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	LRESULT OnShowStatus(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	LRESULT OnShowWatch(UINT nMsg, WPARAM wParam, LPARAM lParam);
 

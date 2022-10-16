@@ -17,8 +17,8 @@ CClientController* CClientController::getInstance() {
 			UINT nMsg;
 			MSGFUNC func;
 		}MsgFuncs[]={
-			{WM_SEND_PACK, &CClientController::OnSendPack},
-			{WM_SEND_DATA, &CClientController::OnSendData},
+			//{WM_SEND_PACK, &CClientController::OnSendPack},
+			//{WM_SEND_DATA, &CClientController::OnSendData},
 			{WM_SHOW_STATUS, &CClientController::OnShowStatus},
 			{WM_SHOW_WATCH, &CClientController::OnShowWatch},
 			{(UINT)-1, NULL}
@@ -62,16 +62,26 @@ LRESULT CClientController::SendMessage(MSG msg) {
 }
 
 
-int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData, size_t nLength) {
+int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData,
+	size_t nLength, std::list<CPacket>* plstPacks)
+{
 	CClientSocket* pClient = CClientSocket::getInstance();
-	if (pClient->InitSocket() == false)return false;
 	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	pClient->Send(CPacket(nCmd, pData, nLength, hEvent));
-	int cmd = DealCommand();
-	TRACE("SendCommandPack cmd:%d\r\n", cmd);
-	if (bAutoClose)
-		CloseSocket();
-	return cmd;
+
+	//需要保证传递的包有结果
+	std::list<CPacket> lstPacks;	//应答结果包
+	if (plstPacks == NULL) {
+		//默认为空情况下等于局部变量的结果包
+		plstPacks = &lstPacks;
+	}
+	
+	pClient->SendPacket(CPacket(nCmd, pData, nLength, hEvent), *plstPacks);
+	//有内容返回命令号，没有则返回错误
+	if (plstPacks->size() > 0) {
+		return plstPacks->front().sCmd;
+	}
+
+	return -1;
 }
 
 
@@ -107,7 +117,7 @@ void CClientController::StartWatchScreen() {
 	m_isClose = false;
 	//设置父类窗口
 	//m_watchDlg.SetParent(&m_remoteDlg);
-	m_hThreadWatch = (HANDLE)_beginthread(&CClientController::threadWatchScreenE, 0, this);
+	m_hThreadWatch = (HANDLE)_beginthread(&CClientController::threadWatchScreen, 0, this);
 	m_watchDlg.DoModal();
 	m_isClose = true;
 	WaitForSingleObject(m_hThreadWatch, 500);
@@ -118,9 +128,10 @@ void CClientController::threadWatchScreen() {
 	Sleep(50);
 	while (!m_isClose) {
 		if (m_watchDlg.isFull() == false) {
-			int ret = SendCommandPacket(6);
+			std::list<CPacket> lstPacks;
+			int ret = SendCommandPacket(6, true, NULL, 0, &lstPacks);
 			if (ret == 6) {
-				if (GetImage(m_remoteDlg.GetImage()) == 0) {
+				if (CHeTool::BytesToImage(m_remoteDlg.GetImage(), lstPacks.front().strData) == 0) {
 					m_watchDlg.SetImageStatus(true);
 				} else {
 					TRACE("图片获取失败，ret=%d\r\n", ret);
@@ -132,7 +143,7 @@ void CClientController::threadWatchScreen() {
 }
 
 
-void CClientController::threadWatchScreenE(void* arg) {
+void CClientController::threadWatchScreen(void* arg) {
 	CClientController* thiz = (CClientController*)arg;
 	thiz->threadWatchScreen();
 	_endthread();
@@ -224,6 +235,7 @@ unsigned __stdcall CClientController::threadEntry(void* arg) {
 }
 
 
+/*
 LRESULT CClientController::OnSendPack(UINT nMsg, WPARAM wParam, LPARAM lParam) {
 	CClientSocket* pClient = CClientSocket::getInstance();
 	CPacket* pPacket = (CPacket*)wParam;
@@ -236,6 +248,7 @@ LRESULT CClientController::OnSendData(UINT nMsg, WPARAM wParam, LPARAM lParam) {
 	char* pBuffer = (char*)wParam;
 	return pClient->Send(pBuffer, (int)lParam);
 }
+*/
 
 
 LRESULT CClientController::OnShowStatus(UINT nMsg, WPARAM wParam, LPARAM lParam) {

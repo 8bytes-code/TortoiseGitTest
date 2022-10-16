@@ -216,16 +216,26 @@ public:
 		return -1;
 	}
 
-	bool Send(const char* pData, int nSize) {
-		if (m_sock == -1)return false;
-		return send(m_sock, pData, nSize, 0) > 0;
-	}
+	//重新封装发包，因为包含了事件，需要匹配
+	bool SendPacket(const CPacket& pack, std::list<CPacket>& lstPacks) {
+		if (m_sock == INVALID_SOCKET) {
+			if (InitSocket() == false) return false;
+			_beginthread(&CClientSocket::threadEntry, 0, this);
+		}
 
-	bool Send(const CPacket& pack) {
-		if (m_sock == -1)return false;
-		std::string strOut;
-		pack.Data(strOut);
-		return send(m_sock, strOut.c_str(), strOut.size(), 0) > 0;
+		m_lstSend.push_back(pack);
+		WaitForSingleObject(pack.hEvent, INFINITE);
+		std::map<HANDLE, std::list<CPacket>>::iterator it;
+		it = m_mapAck.find(pack.hEvent);
+		if (it != m_mapAck.end()) {
+			std::list<CPacket>::iterator i;
+			for (i = it->second.begin(); i != it->second.end(); i++) {
+				lstPacks.push_back(*i);
+			}
+			m_mapAck.erase(it);
+			return true;
+		}
+		return false;
 	}
 
 	bool GetFilePath(std::string& strPath) {
@@ -242,7 +252,6 @@ public:
 			memcpy(&mouse, m_packet.strData.c_str(), sizeof(MOUSEEV));
 			return true;
 		}
-
 		return false;
 	}
 
@@ -256,8 +265,10 @@ public:
 	}
 
 	void UpdateAddress(int nIP, int nPort) {
-		m_nIP = nIP;
-		m_nPort = nPort;
+		if ((m_nIP != nIP) || (nPort != nPort)) {
+			m_nIP = nIP;
+			m_nPort = nPort;
+		}
 	}
 
 private:
@@ -274,7 +285,7 @@ private:
 	SOCKET m_sock;
 	CPacket m_packet;
 
-	CClientSocket():m_nIP(INADDR_ANY), m_nPort(0) {
+	CClientSocket():m_nIP(INADDR_ANY), m_nPort(0), m_sock(INVALID_SOCKET) {
 		if (InitSockEnv() == FALSE) {
 			MessageBox(NULL, _T("无法初始化套接字环境，请检查网络设置！"), _T("初始化错误!"), MB_OK | MB_ICONERROR);
 			exit(0);
@@ -295,6 +306,19 @@ private:
 		WSACleanup();
 	}
 
+	bool Send(const char* pData, int nSize) {
+		if (m_sock == -1)return false;
+		return send(m_sock, pData, nSize, 0) > 0;
+	}
+
+	bool Send(const CPacket& pack) {
+		if (m_sock == -1)return false;
+		std::string strOut;
+		pack.Data(strOut);
+		return send(m_sock, strOut.c_str(), strOut.size(), 0) > 0;
+	}
+
+	//线程处理包
 	static void threadEntry(void* arg);
 	void threadFunc();
 
