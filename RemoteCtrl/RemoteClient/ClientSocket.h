@@ -3,13 +3,15 @@
 #include "framework.h"
 #include <string>
 #include <vector>
+#include <list>
+#include <map>
 
 #pragma pack(push)
 #pragma pack(1)
 class CPacket {
 public:
 	CPacket() :sHead(0), nLength(0), sCmd(0), sSum(0) {}
-	CPacket(WORD nCmd, const BYTE* pData, size_t nSize) {
+	CPacket(WORD nCmd, const BYTE* pData, size_t nSize, HANDLE hEvent) {
 		sHead = 0xFEFF;
 		nLength = nSize + 4;
 		sCmd = nCmd;
@@ -25,6 +27,8 @@ public:
 		for (size_t j = 0; j < strData.size(); j++) {
 			sSum += BYTE(strData[j]) & 0xFF;
 		}
+
+		this->hEvent = hEvent;
 	}
 	CPacket(const CPacket& pack) {
 		sHead = pack.sHead;
@@ -32,8 +36,9 @@ public:
 		sCmd = pack.sCmd;
 		strData = pack.strData;
 		sSum = pack.sSum;
+		hEvent = pack.hEvent;
 	}
-	CPacket(const BYTE* pData, size_t& nSize) {
+	CPacket(const BYTE* pData, size_t& nSize): hEvent(INVALID_HANDLE_VALUE) {
 		size_t i = 0;
 		for (; i < nSize; i++) {
 			if (*(WORD*)(pData + i) == 0xFEFF) {
@@ -83,6 +88,7 @@ public:
 			sCmd = pack.sCmd;
 			strData = pack.strData;
 			sSum = pack.sSum;
+			hEvent = pack.hEvent;
 		}
 		return *this;
 	}
@@ -108,6 +114,7 @@ public:
 	WORD sCmd;				//控制命令		2
 	std::string strData;	//包数据
 	WORD sSum;				//校验：和校验	2
+	HANDLE hEvent;			//事件
 	//std::string strOut;		//整个包数据
 };
 #pragma pack(pop)
@@ -252,7 +259,15 @@ public:
 		m_nIP = nIP;
 		m_nPort = nPort;
 	}
+
 private:
+	std::list<CPacket> m_lstSend;
+	/*
+	* vector貌似创建的时候内容会比设置的大一点，方便扩容，但是如果包太大，vector
+	* 可能需要频繁的扩容，移动，对于时间复杂度而言此时vector并不适用，因为到底发多少包也不清楚
+	* list则是双向链表，只需要改变指向就行，不过可能造成的内存碎片比较高，空间利用率比较低
+	*/
+	std::map<HANDLE, std::list<CPacket>> m_mapAck;
 	int m_nIP;		//地址
 	int m_nPort;	//端口
 	std::vector<char> m_buffer;
@@ -276,8 +291,12 @@ private:
 
 	~CClientSocket() {
 		closesocket(m_sock);
+		m_sock = INVALID_SOCKET;
 		WSACleanup();
 	}
+
+	static void threadEntry(void* arg);
+	void threadFunc();
 
 	BOOL InitSockEnv() {
 		WSADATA data;

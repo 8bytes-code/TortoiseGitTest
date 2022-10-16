@@ -55,7 +55,6 @@ LRESULT CClientController::SendMessage(MSG msg) {
 	if (hEvent == NULL)return-2;
 	MSGINFO info(msg);
 	PostThreadMessage(m_nThreadID, WM_SEND_MESSAGE, (WPARAM)&info, (LPARAM)hEvent);
-	
 	//一直等待信号
 	WaitForSingleObject(hEvent, -1);
 	
@@ -66,7 +65,8 @@ LRESULT CClientController::SendMessage(MSG msg) {
 int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData, size_t nLength) {
 	CClientSocket* pClient = CClientSocket::getInstance();
 	if (pClient->InitSocket() == false)return false;
-	pClient->Send(CPacket(nCmd, pData, nLength));
+	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	pClient->Send(CPacket(nCmd, pData, nLength, hEvent));
 	int cmd = DealCommand();
 	TRACE("SendCommandPack cmd:%d\r\n", cmd);
 	if (bAutoClose)
