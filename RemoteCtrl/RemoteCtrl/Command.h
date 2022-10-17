@@ -60,9 +60,9 @@ protected:
 		//由于getfilepath实际上就是根据命令取走packet的strdata，而此时已经增设参数故此直接=
 		std::string strPath = inPacket.strData;
 
-		TRACE("cd C is %d\r\n", _chdir("C:"));
+		//TRACE("cd C is %d\r\n", _chdir("C:"));
 		if (_chdir(strPath.c_str()) != 0) {
-			TRACE("cd strPath:[%s] is %d\r\n", strPath.c_str(), _chdir(strPath.c_str()));
+			//TRACE("cd strPath:[%s] is %d\r\n", strPath.c_str(), _chdir(strPath.c_str()));
 			FILEINFO finfo;
 			finfo.HasNext = FALSE;
 			lstPacket.push_back(CPacket(2, (BYTE*)&finfo, sizeof(finfo)));

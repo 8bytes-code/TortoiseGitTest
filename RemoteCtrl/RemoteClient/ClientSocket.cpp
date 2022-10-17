@@ -22,19 +22,31 @@ std::string GetErrInfo(int wsaErrCode) {
 	return ret;
 }
 
-bool CClientSocket::SendPacket(const CPacket& pack, std::list<CPacket>& lstPacks, bool isAutoClosed) {
+void Dump(BYTE* pData, size_t nSize) {
+	std::string strOut;
+	for (size_t i = 0; i < nSize; i++) {
+		char buf[8] = "";
+		if (i > 0 && (i % 16 == 0)) strOut += "\n";
+		snprintf(buf, sizeof(buf), "%02X ", pData[i] & 0xFF);
+		strOut += buf;
+	}
+	strOut += "\n";
+	OutputDebugStringA(strOut.c_str());
+}
+
+bool CClientSocket::SendPacket(const CPacket& pack, std::list<CPacket>& lstPacks, bool isAutoClosed /*= true*/) {
 	if (m_sock == INVALID_SOCKET) {
 		//if (InitSocket() == false) return false;
 		_beginthread(&CClientSocket::threadEntry, 0, this);
 	}
 
-	auto pr = m_mapAck.insert(std::pair<HANDLE, std::list<CPacket>>(pack.hEvent, lstPacks));
-	//修订连接问题
+	auto pr = m_mapAck.insert(std::pair<HANDLE, std::list<CPacket>&>(pack.hEvent, lstPacks));
+	//添加状态队列
 	m_mapAutoClosed.insert(std::pair<HANDLE, bool>(pack.hEvent, isAutoClosed));
-	
+
 	m_lstSend.push_back(pack);
 	WaitForSingleObject(pack.hEvent, INFINITE);
-	std::map<HANDLE, std::list<CPacket>>::iterator it;
+	std::map<HANDLE, std::list<CPacket>&>::iterator it;
 	it = m_mapAck.find(pack.hEvent);
 	if (it != m_mapAck.end()) {
 		m_mapAck.erase(it);
@@ -65,36 +77,43 @@ void CClientSocket::threadFunc() {
 				continue;
 			}		
 			
-			std::map<HANDLE, std::list<CPacket>>::iterator it;
+			std::map<HANDLE, std::list<CPacket>&>::iterator it;
 			it = m_mapAck.find(head.hEvent);
-			std::map<HANDLE, bool>::iterator it0 = m_mapAutoClosed.find(head.hEvent);
-			do {
-				int length = recv(m_sock, pBuffer + index, BUFFER_SIZE - index, 0);
-				if (length > 0 || index > 0) {
-					index += length;
-					size_t size = (size_t)index;
-					CPacket pack((BYTE*)pBuffer, size);
+			//还要预防it挪到end之后
+			if (it != m_mapAck.end()) {
+				std::map<HANDLE, bool>::iterator it0 = m_mapAutoClosed.find(head.hEvent);
+				do {
+					int length = recv(m_sock, pBuffer + index, BUFFER_SIZE - index, 0);
+					if (length > 0 || index > 0) {
+						index += length;
+						size_t size = (size_t)index;
+						CPacket pack((BYTE*)pBuffer, size);
 
-					if (size > 0) {
-						pack.hEvent = head.hEvent;
-						it->second.push_back(pack);
-						//监视缓冲区，图片处于其中，当index指向没有改变，
-						//就一直重复第一张图，但是数据是一直在接受
-						memmove(pBuffer, pBuffer + size, index - size);
-						index -= size;
-						if (it0->second) {
-							SetEvent(head.hEvent);
+						if (size > 0) {
+							pack.hEvent = head.hEvent;
+							it->second.push_back(pack);
+							//监视缓冲区，图片处于其中，当index指向没有改变，
+							//就一直重复第一张图，但是数据是一直在接受，因为没有在缓冲区移动
+							memmove(pBuffer, pBuffer + size, index - size);
+							index -= size;
+							if (it0->second) {
+								SetEvent(head.hEvent);
+							}
 						}
+					} else if (length <= 0 && index <= 0) {
+						CloseSocket();
+						//等到服务器结束命令之后在通知事件完成
+						SetEvent(head.hEvent);
+						m_mapAutoClosed.erase(it0);
+						break;
 					}
-				} else if (length <= 0 && index <= 0) {
-					CloseSocket();
-					//等到服务器结束命令之后在通知事件完成
-					SetEvent(head.hEvent);
-				}
-				//只要close没有false掉就持续recv
-			} while (it0->second == false);
+					//只要close没有false掉就持续recv
+				} while (it0->second == false);
+			}
 			m_lstSend.pop_front();
-			InitSocket();
+			if (InitSocket() == false) {
+				InitSocket();
+			}
 		}
 	}
 	CloseSocket();

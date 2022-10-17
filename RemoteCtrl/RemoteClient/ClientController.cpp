@@ -75,7 +75,7 @@ int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData,
 		plstPacks = &lstPacks;
 	}
 	
-	pClient->SendPacket(CPacket(nCmd, pData, nLength, hEvent), *plstPacks);
+	pClient->SendPacket(CPacket(nCmd, pData, nLength, hEvent), *plstPacks, bAutoClose);
 	CloseHandle(hEvent);	//回收事件句柄，防止资源耗尽
 	//有内容返回命令号，没有则返回错误
 	if (plstPacks->size() > 0) {
@@ -103,7 +103,6 @@ int CClientController::DownFile(CString strPath) {
 
 		//让光标进入等待状态
 		m_remoteDlg.BeginWaitCursor();
-
 		m_statusDlg.m_info.SetWindowText(_T("命令正在执行中！"));
 		m_statusDlg.ShowWindow(SW_SHOW);
 		m_statusDlg.CenterWindow(&m_remoteDlg);
@@ -207,7 +206,7 @@ void CClientController::threadFunc() {
 			HANDLE hEvent = (HANDLE)msg.lParam;
 
 			//老样子消息循环队列完事就给他挪出去
-			std::map<UINT, MSGFUNC>::iterator it = m_mapFunc.find(pmsg->msg.message);
+			std::map<UINT, MSGFUNC>::iterator it = m_mapFunc.find(msg.message);
 			if (it != m_mapFunc.end()) {
 				pmsg->result = (this->*it->second)(pmsg->msg.message, pmsg->msg.wParam, pmsg->msg.lParam);
 			} else {

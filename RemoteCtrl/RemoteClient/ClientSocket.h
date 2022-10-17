@@ -260,7 +260,7 @@ private:
 	* 可能需要频繁的扩容，移动，对于时间复杂度而言此时vector并不适用，因为到底发多少包也不清楚
 	* list则是双向链表，只需要改变指向就行，不过可能造成的内存碎片比较高，空间利用率比较低
 	*/
-	std::map<HANDLE, std::list<CPacket>> m_mapAck;
+	std::map<HANDLE, std::list<CPacket>&> m_mapAck;
 	std::map<HANDLE, bool> m_mapAutoClosed;
 	int m_nIP;		//地址
 	int m_nPort;	//端口
@@ -296,6 +296,7 @@ private:
 	}
 
 	bool Send(const CPacket& pack) {
+		TRACE("m_sock = %d\r\n", m_sock);
 		if (m_sock == -1)return false;
 		std::string strOut;
 		pack.Data(strOut);
