@@ -56,8 +56,8 @@ LRESULT CClientController::SendMessage(MSG msg) {
 	MSGINFO info(msg);
 	PostThreadMessage(m_nThreadID, WM_SEND_MESSAGE, (WPARAM)&info, (LPARAM)hEvent);
 	//一直等待信号
-	WaitForSingleObject(hEvent, -1);
-	
+	WaitForSingleObject(hEvent, INFINITE);
+	CloseHandle(hEvent);
 	return info.result;
 }
 
@@ -76,6 +76,7 @@ int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData,
 	}
 	
 	pClient->SendPacket(CPacket(nCmd, pData, nLength, hEvent), *plstPacks);
+	CloseHandle(hEvent);	//回收事件句柄，防止资源耗尽
 	//有内容返回命令号，没有则返回错误
 	if (plstPacks->size() > 0) {
 		return plstPacks->front().sCmd;
@@ -131,7 +132,7 @@ void CClientController::threadWatchScreen() {
 			std::list<CPacket> lstPacks;
 			int ret = SendCommandPacket(6, true, NULL, 0, &lstPacks);
 			if (ret == 6) {
-				if (CHeTool::BytesToImage(m_remoteDlg.GetImage(), lstPacks.front().strData) == 0) {
+				if (CHeTool::BytesToImage(m_watchDlg.GetImage(), lstPacks.front().strData) == 0) {
 					m_watchDlg.SetImageStatus(true);
 				} else {
 					TRACE("图片获取失败，ret=%d\r\n", ret);

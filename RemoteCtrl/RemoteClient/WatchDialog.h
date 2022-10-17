@@ -43,6 +43,7 @@ public:
 	virtual void OnOK();
 	afx_msg void OnBnClickedBtnLock();
 	afx_msg void OnBnClickedBtnUnlock();
+	CImage m_image;
 
 	bool m_isFull;		//校验缓存是否有数据，true有，false无
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
@@ -52,5 +53,9 @@ public:
 
 	bool isFull() const {
 		return m_isFull;
+	}
+
+	CImage& GetImage() {
+		return m_image;
 	}
 };

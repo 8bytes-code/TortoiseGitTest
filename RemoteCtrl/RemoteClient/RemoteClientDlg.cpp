@@ -266,7 +266,7 @@ void CRemoteClientDlg::LoadFileInfo() {
 		if (pInfo->IsDirectory) {
 			//在文件中，包含.和..，需要排除这两个目录防止循环
 			if (CString(pInfo->szFileName) == "." || CString(pInfo->szFileName) == "..") {
-				int cmd = pClient->DealCommand();
+				int cmd = CClientController::getInstance()->DealCommand();
 				TRACE("ack:%d\r\n", cmd);
 				if (cmd < 0)
 					break;
@@ -287,7 +287,7 @@ void CRemoteClientDlg::LoadFileInfo() {
 	}
 	TRACE("Client:Count=%d\r\n", Count);
 	//最后手动关闭
-	pClient->CloseSocket();
+	//pClient->CloseSocket();
 }
 
 void CRemoteClientDlg::LoadFileCurrent() {
@@ -312,7 +312,7 @@ void CRemoteClientDlg::LoadFileCurrent() {
 	}
 
 	//最后手动关闭
-	CClientController::getInstance()->CloseSocket();
+	//CClientController::getInstance()->CloseSocket();
 }
 
 

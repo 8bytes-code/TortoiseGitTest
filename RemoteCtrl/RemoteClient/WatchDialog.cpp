@@ -68,21 +68,17 @@ void CWatchDialog::OnTimer(UINT_PTR nIDEvent) {
 		if (m_isFull) {	
 			CRect rect;
 			m_picture.GetWindowRect(rect);
-			CImage image;
-			if (m_nObjWidth == -1) {
-				m_nObjWidth = image.GetWidth();
-			}
-			if (m_nObjHeight == -1) {
-				m_nObjHeight = image.GetHeight();
-			}
+			m_nObjWidth = m_image.GetWidth();
+			m_nObjHeight = m_image.GetHeight();
+
 			//窗口缩放
-			image.StretchBlt(
+			m_image.StretchBlt(
 				m_picture.GetDC()->GetSafeHdc(), 0, 0, 
 				rect.Width(), rect.Height(), SRCCOPY);
 			//通知窗口进行重绘
 			m_picture.InvalidateRect(NULL);
 			//用完销毁
-			image.Destroy();
+			m_image.Destroy();
 			//状态置为false
 			m_isFull = false;
 		}
@@ -245,7 +241,7 @@ CPoint CWatchDialog::UserPointRemoteScreenPoint(CPoint& point, bool isScreen) {
 
 	//本地坐标到远程坐标
 	m_picture.GetWindowRect(clientRect);
-	TRACE("x=%d y=%d\r\n", clientRect.Width(), clientRect.Height());
+	//TRACE("x=%d y=%d\r\n", clientRect.Width(), clientRect.Height());
 
 	return CPoint(point.x * m_nObjWidth / clientRect.Width(), point.y * m_nObjHeight / clientRect.Height());
 }
