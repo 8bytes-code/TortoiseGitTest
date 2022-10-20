@@ -7,6 +7,8 @@
 #include <map>
 #include <mutex>
 
+#define WM_SEND_PACK (WM_USER+1)	//发送包数据消息
+
 #pragma pack(push)
 #pragma pack(1)
 class CPacket {
@@ -214,7 +216,7 @@ public:
 	CPacket& GetPacket() {
 		return m_packet;
 	}
-	
+
 	void CloseSocket() {
 		closesocket(m_sock);
 		m_sock = INVALID_SOCKET;
@@ -228,6 +230,8 @@ public:
 	}
 
 private:
+	typedef void(CClientSocket::* MSGFUNC)(UINT nMsg, WPARAM wParam, LPARAM lParam);	//消息回调
+	std::map<UINT, MSGFUNC> m_mapFunc;
 	HANDLE m_hThread;
 	std::mutex m_lock;	//互斥体，解决线程数据问题
 	bool m_bAutoClose;
@@ -245,9 +249,8 @@ private:
 	SOCKET m_sock;
 	CPacket m_packet;
 
-	CClientSocket():m_nIP(INADDR_ANY), m_nPort(0), m_sock(INVALID_SOCKET), 
-		m_bAutoClose(true), m_hThread(INVALID_HANDLE_VALUE) 
-	{
+	CClientSocket() :m_nIP(INADDR_ANY), m_nPort(0), m_sock(INVALID_SOCKET),
+		m_bAutoClose(true), m_hThread(INVALID_HANDLE_VALUE) {
 		if (InitSockEnv() == FALSE) {
 			MessageBox(NULL, _T("无法初始化套接字环境，请检查网络设置！"), _T("初始化错误!"), MB_OK | MB_ICONERROR);
 			exit(0);
@@ -255,7 +258,20 @@ private:
 		m_buffer.resize(BUFFER_SIZE);
 		memset(m_buffer.data(), 0, BUFFER_SIZE);
 	}
-	CClientSocket(const CClientSocket& ss){
+	CClientSocket(const CClientSocket& ss) {
+		struct {
+			UINT message;
+			MSGFUNC func;
+		}funcs[] = {
+			{WM_SEND_PACK,&CClientSocket::SendPack},
+			{0,NULL}
+		};
+		for (int i = 0; funcs[i].message != 0; i++) {
+			if (m_mapFunc.insert(std::pair<UINT, MSGFUNC>(funcs[i].message, funcs[i].func)).second == false) {
+				TRACE("插入失败，消息值：%d，函数值：%08X，序号：%d\r\n", funcs[i].message, funcs[i].func, i);
+			}
+		}
+		m_hThread = INVALID_HANDLE_VALUE;
 		m_bAutoClose = ss.m_bAutoClose;
 		m_sock = ss.m_sock;
 		m_nIP = ss.m_nIP;
@@ -268,6 +284,8 @@ private:
 		m_sock = INVALID_SOCKET;
 		WSACleanup();
 	}
+
+	void SendPack(UINT nMsg, WPARAM wParam, LPARAM lParam);
 
 	bool Send(const char* pData, int nSize) {
 		if (m_sock == -1)return false;
@@ -285,6 +303,7 @@ private:
 	//线程处理包
 	static void threadEntry(void* arg);
 	void threadFunc();
+	void threadFunc2();	//回调处理
 
 	BOOL InitSockEnv() {
 		WSADATA data;

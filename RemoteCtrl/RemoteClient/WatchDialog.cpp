@@ -236,7 +236,10 @@ void CWatchDialog::OnMouseMove(UINT nFlags, CPoint point) {
 CPoint CWatchDialog::UserPointRemoteScreenPoint(CPoint& point, bool isScreen) {
 //client dlgSize 800*450
 	CRect clientRect;
-	if(isScreen) ScreenToClient(&point);	//屏幕坐标到客户端坐标
+	if (!isScreen) {
+		ClientToScreen(&point);				//先将坐标转换成监视窗口的坐标
+	}
+	m_picture.ScreenToClient(&point);	//再将坐标转换成控件区域的坐标
 	TRACE("x=%d y=%d\r\n", point.x, point.y);
 
 	//本地坐标到远程坐标

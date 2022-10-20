@@ -86,6 +86,22 @@ bool CClientSocket::SendPacket(const CPacket& pack, std::list<CPacket>& lstPacks
 	return false;
 }
 
+void CClientSocket::SendPack(UINT nMsg, WPARAM wParam/*缓冲区的值*/, LPARAM lParam/*缓冲区长度*/) {
+	// TODO:待完善
+	if (InitSocket() == true) {
+		int ret = send(m_sock, (char*)wParam, (int)lParam, 0);
+		if (ret > 0) {
+
+		} else {
+			CloseSocket();
+		}
+	} else {
+		
+	}
+	
+	
+}
+
 void CClientSocket::threadEntry(void* arg) {
 	CClientSocket* thiz = (CClientSocket*)arg;
 	thiz->threadFunc();
@@ -138,7 +154,12 @@ void CClientSocket::threadFunc() {
 						CloseSocket();
 						//等到服务器结束命令之后在通知事件完成
 						SetEvent(head.hEvent);
-						m_mapAutoClosed.erase(it0);
+
+						if (it0 != m_mapAutoClosed.end()) {
+							//m_mapAutoClosed.erase(it0);
+						} else {
+							TRACE("error, erase not found pair！\r\n");
+						}
 						break;
 					}
 					//只要close没有false掉就持续recv
@@ -146,6 +167,7 @@ void CClientSocket::threadFunc() {
 			}
 			m_lock.lock();
 			m_lstSend.pop_front();
+			m_mapAutoClosed.erase(head.hEvent);
 			m_lock.unlock();
 			if (InitSocket() == false) {
 				InitSocket();
@@ -155,4 +177,16 @@ void CClientSocket::threadFunc() {
 		}
 	}
 	CloseSocket();
+}
+
+void CClientSocket::threadFunc2() {
+	MSG msg;
+	while (::GetMessage(&msg, NULL, 0, 0)) {
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+		if (m_mapFunc.find(msg.message) != m_mapFunc.end()) {
+			(this->*m_mapFunc[msg.message])(msg.message, msg.wParam, msg.lParam);
+			
+		}
+	}
 }
