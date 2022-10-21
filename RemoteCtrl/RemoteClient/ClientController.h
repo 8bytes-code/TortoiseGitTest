@@ -46,13 +46,13 @@ public:
 	//7.锁机
 	//8.解锁机
 	//9.删除文件   
-	//返回值为命令号,小于0则表示有错
-	int SendCommandPacket(
+	//返回值为状态，true为成功，false为失败
+	bool SendCommandPacket(
+		HWND hWnd,	//数据包收到后，需要应答的窗口
 		int nCmd,
 		bool bAutoClose = true,
 		BYTE* pData = NULL,
-		size_t nLength = 0,
-		std::list<CPacket>* plstPacks = NULL
+		size_t nLength = 0
 	);
 
 	int GetImage(CImage& image) {
