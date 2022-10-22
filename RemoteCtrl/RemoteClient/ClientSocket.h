@@ -153,19 +153,23 @@ enum {
 typedef struct PacketData {
 	std::string strData;
 	UINT nMode;
-	PacketData(const char* pData, size_t nLen, UINT mode) {
+	WPARAM wParam;
+	PacketData(const char* pData, size_t nLen, UINT mode, WPARAM nParam = 0) {
 		strData.resize(nLen);
 		memcpy((char*)strData.c_str(), pData, nLen);
 		nMode = mode;
+		wParam = nParam;
 	}
 	PacketData(const PacketData& data) {
 		strData = data.strData;
 		nMode = data.nMode;
+		wParam = data.wParam;
 	}
 	PacketData& operator=(const PacketData& data) {
 		if (this != &data) {
 			strData = data.strData;
 			nMode = data.nMode;
+			wParam = data.wParam;
 		}
 		return *this;
 	}
@@ -216,7 +220,7 @@ public:
 	}
 
 	//重新封装发包，因为包含了事件，需要匹配
-	bool SendPacket(HWND hWnd, CPacket& pack, bool isAutoClosed = true);
+	bool SendPacket(HWND hWnd, CPacket& pack, bool isAutoClosed = true, WPARAM wParam = 0);
 
 	bool GetFilePath(std::string& strPath) {
 		//当前命令为2-4才是去执行获取文件列表

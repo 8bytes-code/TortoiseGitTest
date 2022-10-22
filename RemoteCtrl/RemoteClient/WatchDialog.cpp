@@ -42,6 +42,7 @@ BEGIN_MESSAGE_MAP(CWatchDialog, CDialog)
 	ON_STN_CLICKED(IDC_WATCH, &CWatchDialog::OnStnClickedWatch)
 	ON_BN_CLICKED(IDC_BTN_LOCK, &CWatchDialog::OnBnClickedBtnLock)
 	ON_BN_CLICKED(IDC_BTN_UNLOCK, &CWatchDialog::OnBnClickedBtnUnlock)
+	ON_MESSAGE(WM_SEND_PACK_ACK,&CWatchDialog::OnSendPackAck)
 END_MESSAGE_MAP()
 
 
@@ -52,7 +53,7 @@ BOOL CWatchDialog::OnInitDialog() {
     CDialog::OnInitDialog();
 
     // TODO:  在此添加额外的初始化
-	SetTimer(0, 45, NULL);
+	//SetTimer(0, 45, NULL);
 	//缓存状态
 	m_isFull = false;
 
@@ -62,27 +63,27 @@ BOOL CWatchDialog::OnInitDialog() {
 
 
 void CWatchDialog::OnTimer(UINT_PTR nIDEvent) {
-	if (nIDEvent == 0) {
-		CClientController* pParent = CClientController::getInstance();
-		//有数据才显示
-		if (m_isFull) {	
-			CRect rect;
-			m_picture.GetWindowRect(rect);
-			m_nObjWidth = m_image.GetWidth();
-			m_nObjHeight = m_image.GetHeight();
-
-			//窗口缩放
-			m_image.StretchBlt(
-				m_picture.GetDC()->GetSafeHdc(), 0, 0, 
-				rect.Width(), rect.Height(), SRCCOPY);
-			//通知窗口进行重绘
-			m_picture.InvalidateRect(NULL);
-			//用完销毁
-			m_image.Destroy();
-			//状态置为false
-			m_isFull = false;
-		}
-	}
+// 	if (nIDEvent == 0) {
+// 		CClientController* pParent = CClientController::getInstance();
+// 		//有数据才显示
+// 		if (m_isFull) {	
+// 			CRect rect;
+// 			m_picture.GetWindowRect(rect);
+// 			m_nObjWidth = m_image.GetWidth();
+// 			m_nObjHeight = m_image.GetHeight();
+// 
+// 			//窗口缩放
+// 			m_image.StretchBlt(
+// 				m_picture.GetDC()->GetSafeHdc(), 0, 0, 
+// 				rect.Width(), rect.Height(), SRCCOPY);
+// 			//通知窗口进行重绘
+// 			m_picture.InvalidateRect(NULL);
+// 			//用完销毁
+// 			m_image.Destroy();
+// 			//状态置为false
+// 			m_isFull = false;
+// 		}
+// 	}
 
 	CDialog::OnTimer(nIDEvent);
 }
@@ -116,6 +117,51 @@ void CWatchDialog::ReSize() {
 		hwndChild = ::GetWindow(hwndChild, GW_HWNDNEXT);
 	}
 	old = Newp;
+}
+
+LRESULT CWatchDialog::OnSendPackAck(WPARAM wParam, LPARAM lParam) {
+	if (lParam == -1 || lParam == -2) {
+		//错误
+	}
+	else if (lParam == 1) {
+		//对方关闭套接字
+	}
+	else {
+		CPacket* pPacket = (CPacket*)wParam;
+		if (pPacket != NULL) {
+			switch (pPacket->sCmd) {
+				case 6:
+				{
+					if (m_isFull == true) {
+						CHeTool::BytesToImage(m_image, pPacket->strData);
+						CRect rect;
+						m_picture.GetWindowRect(rect);
+						m_nObjWidth = m_image.GetWidth();
+						m_nObjHeight = m_image.GetHeight();
+						//窗口缩放
+						m_image.StretchBlt(m_picture.GetDC()->GetSafeHdc(), 0, 0,
+							rect.Width(), rect.Height(), SRCCOPY);
+						//通知窗口进行重绘
+						m_picture.InvalidateRect(NULL);
+						//用完销毁
+						m_image.Destroy();
+						//状态置为false
+						m_isFull = false;
+					}
+						
+				}
+				break;
+
+				case 5:
+				case 7:
+				case 8:
+				default:
+					break;
+			}
+		}
+	}
+	
+	return 0;
 }
 
 void CWatchDialog::OnSize(UINT nType, int cx, int cy) {
