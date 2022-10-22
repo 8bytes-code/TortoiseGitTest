@@ -410,10 +410,11 @@ LRESULT CRemoteClientDlg::OnSendPackAck(WPARAM wParam, LPARAM lParam) {
 		//对方关闭套接字
 	}
 	else {
-		CPacket* pPacket = (CPacket*)wParam;
-		if (pPacket != NULL) {
-			CPacket& head = *pPacket;
-			switch (pPacket->sCmd) {
+		if (wParam != NULL) {
+			CPacket head = *(CPacket*)wParam;
+			//防止内存泄露
+			delete (CPacket*)wParam;
+			switch (head.sCmd) {
 				case 1:	//获取驱动信息
 				{
 					std::string drivers = head.strData;
@@ -441,7 +442,7 @@ LRESULT CRemoteClientDlg::OnSendPackAck(WPARAM wParam, LPARAM lParam) {
 						if (CString(pInfo->szFileName) == "." || CString(pInfo->szFileName) == "..") {
 							break;
 						}
-						HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, (HTREEITEM)wParam, TVI_LAST);
+						HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, (HTREEITEM)lParam, TVI_LAST);
 						m_Tree.InsertItem("", hTemp, TVI_LAST);
 					}
 					else {
