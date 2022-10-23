@@ -116,7 +116,7 @@ bool CClientSocket::SendPacket(HWND hWnd, CPacket& pack, bool isAutoClosed, WPAR
 	}
 	return ret;
 }
-
+ 
 /*
 bool CClientSocket::SendPacket(const CPacket& pack, std::list<CPacket>& lstPacks, bool isAutoClosed ) {
 	if (m_sock == INVALID_SOCKET && m_hThread == INVALID_HANDLE_VALUE) {
@@ -148,6 +148,9 @@ void CClientSocket::SendPack(UINT nMsg, WPARAM wParam/*缓冲区的值*/, LPARAM lPar
 	PACKET_DATA data = *(PACKET_DATA*)wParam;
 	delete (PACKET_DATA*)wParam;
 	HWND hWnd = (HWND)lParam;
+	size_t nTemp = data.strData.size();
+	CPacket current((BYTE*)data.strData.c_str(), nTemp);
+
 	if (InitSocket() == true) {
 		int ret = send(m_sock, (char*)data.strData.c_str(), (int)data.strData.size(), 0);
 		if (ret > 0) {
@@ -170,15 +173,17 @@ void CClientSocket::SendPack(UINT nMsg, WPARAM wParam/*缓冲区的值*/, LPARAM lPar
 							CloseSocket();
 							return;
 						}
+						//缓冲区往后挪
+						index -= nLen;
+						//之前逻辑有误，index是缓冲区的起始点，index+length是传过来的数据，nLen是在缓冲区内的指标，这也是文件列表排序有点问题的原因
+						memmove(pBuffer, pBuffer + nLen, index);
 					}
-					//缓冲区往后挪
-					index -= nLen;
-					memmove(pBuffer, pBuffer + index, nLen);
 				} 
 				else {
 					//意料之外就噶了他
 					CloseSocket();
-					::SendMessage(hWnd, WM_SEND_PACK_ACK, NULL, 1);
+					::SendMessage(hWnd, WM_SEND_PACK_ACK, (WPARAM)new CPacket(current.sCmd, NULL, 0), 1);
+					//::SendMessage(hWnd, WM_SEND_PACK_ACK, NULL, 1);
 				}
 			}
 		} 

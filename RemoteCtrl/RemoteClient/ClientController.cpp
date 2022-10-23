@@ -71,9 +71,9 @@ bool CClientController::SendCommandPacket(HWND hWnd, int nCmd, bool bAutoClose, 
 
 
 void CClientController::DownloadEnd() {
-	m_statusDlg.ShowWindow(SW_SHOW);
-	m_statusDlg.CenterWindow(&m_remoteDlg);
-	m_statusDlg.SetActiveWindow();
+	m_statusDlg.ShowWindow(SW_HIDE);
+	m_remoteDlg.EndWaitCursor();
+	m_remoteDlg.MessageBox(_T("下载完成!!!"), _T("完成"));
 }
 
 int CClientController::DownFile(CString strPath) {

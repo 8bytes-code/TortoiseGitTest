@@ -241,29 +241,8 @@ void CRemoteClientDlg::LoadFileInfo() {
 	m_List.DeleteAllItems();
 	CString strPath = GetPath(hTreeSelected);
 	TRACE("strpath = [%s]\r\n", strPath);
-	std::list<CPacket> lstPackets;
-	int nCmd = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength(), (WPARAM)hTreeSelected);
+	CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength(), (WPARAM)hTreeSelected);
 
-	//重新设计获取文件树
-	if (lstPackets.size() > 0) {
-		TRACE("lstPackets len=%d\r\n", lstPackets.size());
-		std::list<CPacket>::iterator it = lstPackets.begin();
-		for (; it != lstPackets.end(); it++) {
-			PFILEINFO pInfo = (PFILEINFO)(*it).strData.c_str();
-			if(pInfo->HasNext == FALSE) continue;
-			if (pInfo->IsDirectory) {
-				//在文件中，包含.和..，需要排除这两个目录防止循环
-				if (CString(pInfo->szFileName) == "." || CString(pInfo->szFileName) == "..") {
-					continue;
-				}
-				HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, hTreeSelected, TVI_LAST);
-				m_Tree.InsertItem("", hTemp, TVI_LAST);
-			} else {
-				//文件插入到列表中
-				m_List.InsertItem(0, pInfo->szFileName);
-			}
-		}
-	}
 }
 
 void CRemoteClientDlg::LoadFileCurrent() {
@@ -403,7 +382,7 @@ void CRemoteClientDlg::OnEnChangeEditPort() {
 
 LRESULT CRemoteClientDlg::OnSendPackAck(WPARAM wParam, LPARAM lParam) {
 	
-	if (lParam == -1 || lParam == -2) {
+	if (lParam == -1 || (lParam == -2)) {
 		//错误
 	}
 	else if (lParam == 1) {
@@ -436,6 +415,7 @@ LRESULT CRemoteClientDlg::OnSendPackAck(WPARAM wParam, LPARAM lParam) {
 				case 2:	//获取文件信息
 				{
 					PFILEINFO pInfo = (PFILEINFO)head.strData.c_str();
+					TRACE("[pInfo] hasnext:%d isdirecotry:%d %s\r\n", pInfo->HasNext, pInfo->IsDirectory, pInfo->szFileName);
 					if (pInfo->HasNext == FALSE) break;
 					if (pInfo->IsDirectory) {
 						//在文件中，包含.和..，需要排除这两个目录防止循环
@@ -444,6 +424,8 @@ LRESULT CRemoteClientDlg::OnSendPackAck(WPARAM wParam, LPARAM lParam) {
 						}
 						HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, (HTREEITEM)lParam, TVI_LAST);
 						m_Tree.InsertItem("", hTemp, TVI_LAST);
+						//展开节点
+						m_Tree.Expand((HTREEITEM)lParam, TVE_EXPAND);
 					}
 					else {
 						//文件插入到列表中
@@ -464,7 +446,7 @@ LRESULT CRemoteClientDlg::OnSendPackAck(WPARAM wParam, LPARAM lParam) {
 							CClientController::getInstance()->DownloadEnd();
 						}
 					}
-					else if (length > 0 && index >= length) {
+					else if (length > 0 && (index >= length)) {
 						fclose((FILE*)lParam);
 						length = 0;
 						index = 0;
@@ -474,6 +456,12 @@ LRESULT CRemoteClientDlg::OnSendPackAck(WPARAM wParam, LPARAM lParam) {
 						FILE* pFile = (FILE*)lParam;
 						fwrite(head.strData.c_str(), 1, head.strData.size(), pFile);
 						index += head.strData.size();
+						if (index >= length) {
+							fclose((FILE*)lParam);
+							length = 0;
+							index = 0;
+							CClientController::getInstance()->DownloadEnd();
+						}
 					}
 				}
 				break;
