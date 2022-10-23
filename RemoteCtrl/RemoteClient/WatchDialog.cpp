@@ -129,30 +129,31 @@ LRESULT CWatchDialog::OnSendPackAck(WPARAM wParam, LPARAM lParam) {
 	else {
 		CPacket* pPacket = (CPacket*)wParam;
 		if (pPacket != NULL) {
-			switch (pPacket->sCmd) {
+			CPacket head = *(CPacket*)wParam;
+			delete (CPacket*)wParam;
+			switch (head.sCmd) {
 				case 6:
 				{
-					if (m_isFull == true) {
-						CHeTool::BytesToImage(m_image, pPacket->strData);
-						CRect rect;
-						m_picture.GetWindowRect(rect);
-						m_nObjWidth = m_image.GetWidth();
-						m_nObjHeight = m_image.GetHeight();
-						//窗口缩放
-						m_image.StretchBlt(m_picture.GetDC()->GetSafeHdc(), 0, 0,
-							rect.Width(), rect.Height(), SRCCOPY);
-						//通知窗口进行重绘
-						m_picture.InvalidateRect(NULL);
-						//用完销毁
-						m_image.Destroy();
-						//状态置为false
-						m_isFull = false;
-					}
-						
+					CHeTool::BytesToImage(m_image, head.strData);
+					CRect rect;
+					m_picture.GetWindowRect(rect);
+					m_nObjWidth = m_image.GetWidth();
+					m_nObjHeight = m_image.GetHeight();
+					//窗口缩放
+					m_image.StretchBlt(m_picture.GetDC()->GetSafeHdc(), 0, 0,
+						rect.Width(), rect.Height(), SRCCOPY);
+					//通知窗口进行重绘
+					m_picture.InvalidateRect(NULL);
+					//用完销毁
+					m_image.Destroy();
+					//状态置为false
+					m_isFull = false;
 				}
 				break;
 
 				case 5:
+					TRACE("鼠标操作应答!\r\n");
+					break;
 				case 7:
 				case 8:
 				default:

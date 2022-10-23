@@ -121,21 +121,25 @@ void CClientController::StartWatchScreen() {
 
 void CClientController::threadWatchScreen() {
 	Sleep(50);
+	ULONGLONG nTick = GetTickCount64();
 	while (!m_isClose) {
 		if (m_watchDlg.isFull() == false) {
-			std::list<CPacket> lstPacks;
+			if (GetTickCount64() - nTick < 200) {
+				Sleep(200 - DWORD(GetTickCount64() - nTick));
+			}
+			nTick = GetTickCount64();
 			int ret = SendCommandPacket(m_watchDlg.GetSafeHwnd(), 6, true, NULL, 0);
 			//TODO: 添加消息响应函数WM_SEND_PACK_ACK
-			if (ret == 6) {
-				if (CHeTool::BytesToImage(m_watchDlg.GetImage(), lstPacks.front().strData) == 0) {
-					m_watchDlg.SetImageStatus(true);
-				} else {
-					TRACE("图片获取失败，ret=%d\r\n", ret);
-				}
+			if (ret == 1) {
+				//TRACE("成功发送请求图片命令\r\n");
+			}
+			else {
+				TRACE("图片获取失败，ret=%d\r\n", ret);
 			}
 		}
 		Sleep(1);
 	}
+	TRACE("thread end %d\r\n", m_isClose);
 }
 
 
