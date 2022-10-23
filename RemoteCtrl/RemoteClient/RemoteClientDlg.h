@@ -31,6 +31,16 @@ private:
 	void LoadFileInfo();
 	//应用为刷新目录
 	void LoadFileCurrent();
+	//获取驱动移植
+	void StrToTree(const std::string& drivers, CTreeCtrl& tree);
+	//获取文件移植
+	void UpdateFileInfo(const FILEINFO& finfo, HTREEITEM hParent);
+	//下载文件移植
+	void UpdateDownloadFile(const std::string& strData, FILE* pFile);
+	//初始化数据移植
+	void InitUIData();
+	//命令号移植
+	void DealCommand(WORD nCmd, const std::string& strData, LPARAM lParam);
 
 private:
 	//自定义缓存
