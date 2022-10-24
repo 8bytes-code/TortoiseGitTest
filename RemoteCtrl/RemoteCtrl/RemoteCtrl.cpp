@@ -23,9 +23,51 @@
 CWinApp theApp;
 using namespace std;
 
+void WriteRegisterTable(const CString& strPath) {
+	CString strSubKey = _T("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run");
+	char sPath[MAX_PATH] = "";
+	char sSys[MAX_PATH] = "";
+	std::string strExe = "\\RemoteCtrl.exe ";
+	GetCurrentDirectoryA(MAX_PATH, sPath);
+	GetSystemDirectoryA(sSys, sizeof(sSys));
+	//构造软链接命令
+	std::string strCmd = "mklink " + std::string(sSys) + strExe + std::string(sPath) + strExe;
+	system(strCmd.c_str());
+
+	//打开注册表
+	HKEY hKey = NULL;
+	int ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE, strSubKey, 0, KEY_ALL_ACCESS | KEY_WOW64_64KEY, &hKey);
+	if (ret != ERROR_SUCCESS) {
+		RegCloseKey(hKey);
+		MessageBox(NULL, _T("设置开机启动失败，是否权限不足? \r\n程序启动失败"), _T("错误"), MB_ICONERROR | MB_TOPMOST);
+		exit(0);
+	}
+
+	//写入注册表
+	ret = RegSetValueEx(hKey, _T("RemoteCtrl"), 0, REG_EXPAND_SZ, (BYTE*)(LPCTSTR)strPath, strPath.GetLength() * sizeof(TCHAR));
+	if (ret != ERROR_SUCCESS) {
+		RegCloseKey(hKey);
+		MessageBox(NULL, _T("设置开机启动失败，是否权限不足? \r\n程序启动失败"), _T("错误"), MB_ICONERROR | MB_TOPMOST);
+		exit(0);
+	}
+	RegCloseKey(hKey);
+}
+
+void WriteStartupDir(const CString& strPath) {
+	CString strCmd = GetCommandLine();
+	//消除getcommandline所产生的头尾双引号
+	strCmd.Replace(_T("\""), _T(""));
+	BOOL ret = CopyFile(strCmd, strPath, FALSE);
+	if (ret == FALSE) {
+		MessageBox(NULL, _T("复制文件失败，是否权限不足或文件不存在？\r\n"), _T("错误"), MB_ICONERROR | MB_TOPMOST);
+		exit(0);
+	}
+}
+
 void ChooseAutoInvoke() {
 	//验证是否存在，存在就不用重写了
-	CString strPath = CString(_T("C:\\Windows\\SysWOW64\\RemoteCtrl.exe"));
+	//CString strPath = CString(_T("C:\\Windows\\SysWOW64\\RemoteCtrl.exe"));
+	CString strPath = _T("C:\\Users\\test\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\RemoteCtrl.exe");
 	if (PathFileExists(strPath)) {
 		return;
 	}
@@ -39,32 +81,8 @@ void ChooseAutoInvoke() {
 	int ret = MessageBox(NULL, strInfo, _T("警告"), MB_YESNOCANCEL | MB_ICONWARNING | MB_TOPMOST);
 
 	if (ret == IDYES) {
-		char sPath[MAX_PATH] = "";
-		char sSys[MAX_PATH] = "";
-		std::string strExe = "\\RemoteCtrl.exe ";
-		GetCurrentDirectoryA(MAX_PATH, sPath);
-		GetSystemDirectoryA(sSys, sizeof(sSys));
-		//构造软链接命令
-		std::string strCmd = "mklink " + std::string(sSys) + strExe + std::string(sPath) + strExe;
-		system(strCmd.c_str());
-
-		//打开注册表
-		HKEY hKey = NULL;
-		ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE, strSubKey, 0, KEY_ALL_ACCESS | KEY_WOW64_64KEY, &hKey);
-		if (ret != ERROR_SUCCESS) {
-			RegCloseKey(hKey);
-			MessageBox(NULL, _T("设置开机启动失败，是否权限不足? \r\n程序启动失败"), _T("错误"), MB_ICONERROR | MB_TOPMOST);
-			exit(0);
-		}
-
-		//写入注册表
-		ret = RegSetValueEx(hKey, _T("RemoteCtrl"), 0, REG_EXPAND_SZ, (BYTE*)(LPCTSTR)strPath, strPath.GetLength() * sizeof(TCHAR));
-		if (ret != ERROR_SUCCESS) {
-			RegCloseKey(hKey);
-			MessageBox(NULL, _T("设置开机启动失败，是否权限不足? \r\n程序启动失败"), _T("错误"), MB_ICONERROR | MB_TOPMOST);
-			exit(0);
-		}
-		RegCloseKey(hKey);
+		//WriteRegisterTable(strPath);
+		WriteStartupDir(strPath);
 	}
 	else if (ret == IDCANCEL) {
 		exit(0);
