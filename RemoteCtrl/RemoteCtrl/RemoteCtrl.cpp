@@ -99,8 +99,8 @@ void ShowError() {
 		(LPWSTR)&lpMessageBuf, 0, NULL
 	);
 	OutputDebugString(lpMessageBuf);
+	MessageBox(NULL, lpMessageBuf, _T("发生错误"), 0);
 	LocalFree(lpMessageBuf);
-	exit(0);
 }
 
 //检测提权
@@ -118,6 +118,7 @@ bool IsAdmin() {
 		return false;
 	}
 	CloseHandle(hToken);
+
 	if (len == sizeof(eve)) {
 		//提权成功返回值大于0
 		return eve.TokenIsElevated;
@@ -126,14 +127,38 @@ bool IsAdmin() {
 	return false;
 }
 
-int main() {
-	if (IsAdmin()) {
-		OutputDebugString(L"current is run as administrator!\r\n");
+void RunAsAdmin() {
+	//管理员是否能登录
+	HANDLE hToken = NULL;
+	BOOL ret = LogonUser(L"Administrator", NULL, NULL, LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT, &hToken);
+	if (!ret) {
+		ShowError();
+		MessageBox(NULL, _T("登录失败"), _T("程序错误"), 0);
+		exit(0);
 	}
-	else {
-		OutputDebugString(L"current is run as normal user!\r\n");
-	}
+	OutputDebugString(L"Logon administratos success!\r\n");
 
+	//创建进程
+	STARTUPINFO si = { 0 };
+	PROCESS_INFORMATION pi = { 0 };
+	TCHAR sPath[MAX_PATH] = _T("");
+	GetCurrentDirectory(MAX_PATH, sPath);
+	CString strCmd = sPath;
+	strCmd += _T("\\RemoteCtrl.exe");
+	//ret = CreateProcessWithTokenW(hToken, LOGON_WITH_PROFILE, NULL, (LPWSTR)(LPCTSTR)strCmd, CREATE_UNICODE_ENVIRONMENT, NULL, NULL, &si, &pi);
+	ret = CreateProcessWithLogonW(_T("Administrator"), NULL, NULL, LOGON_WITH_PROFILE, NULL, (LPWSTR)(LPCWSTR)strCmd, CREATE_UNICODE_ENVIRONMENT, NULL, NULL, &si, &pi);
+	CloseHandle(hToken);
+	if (!ret) {
+		ShowError();
+		MessageBox(NULL, strCmd, _T("程序错误"), 0);
+		exit(0);
+	}
+	WaitForSingleObject(pi.hProcess, INFINITE);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+}
+
+int main() {
 	int nRetCode = 0;
 	HMODULE hModule = ::GetModuleHandle(nullptr);
 
@@ -142,7 +167,20 @@ int main() {
 		if (!AfxWinInit(hModule, nullptr, ::GetCommandLine(), 0)) {
 			wprintf(L"错误: MFC 初始化失败\n");
 			nRetCode = 1;
-		} else {
+		} 
+		else {
+			if (IsAdmin()) {
+				OutputDebugString(L"current is run as administrator!\r\n");
+				MessageBox(NULL, _T("管理员"), _T("用户状态"), 0);
+			}
+			else {
+				OutputDebugString(L"current is run as normal user!\r\n");
+				//如果还不是管理员权限就要再去提权
+				RunAsAdmin();
+				MessageBox(NULL, _T("普通用户"), _T("用户状态"), 0);
+				return nRetCode;
+			}
+
 			CCommand cmd;
 			ChooseAutoInvoke();
 			int ret = CServerSocket::getInstance()->Run(&CCommand::RunCommand, &cmd);
@@ -158,9 +196,11 @@ int main() {
 				default:break;
 			}
 		}
-	} else {
+	} 
+	else {
 		wprintf(L"错误: GetModuleHandle 失败\n");
 		nRetCode = 1;
 	}
+
 	return nRetCode;
 }
