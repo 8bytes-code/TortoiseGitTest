@@ -37,20 +37,19 @@ public:
 		m_hCompeletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
 		m_hThread = INVALID_HANDLE_VALUE;
 		if (m_hCompeletionPort != NULL) {
-			m_hThread = (HANDLE)_beginthread(
-				&CHeQueue<T>::theradEntry, 
-				0, m_hCompeletionPort
-			);
+			m_hThread = (HANDLE)_beginthread(&CHeQueue<T>::theradEntry, 0, this);
 		}
 	}
 	~CHeQueue() {
 		if (m_lock)return;
 		m_lock = true;
-		HANDLE hTemp = m_hCompeletionPort;
 		PostQueuedCompletionStatus(m_hCompeletionPort, 0, NULL, NULL);
 		WaitForSingleObject(m_hThread, INFINITE);
-		m_hCompeletionPort = NULL;
-		CloseHandle(hTemp);
+		if (m_hCompeletionPort != NULL) {
+			HANDLE hTemp = m_hCompeletionPort;
+			m_hCompeletionPort = NULL;
+			CloseHandle(hTemp);
+		}
 	}
 	bool PushBack(const T& data) {
 		IocpParam* pParam = new IocpParam(HQPush, data);
@@ -58,8 +57,8 @@ public:
 			delete pParam;
 			return false;
 		}
-		BOOL ret = PostQueuedCompletionStatus(m_hCompeletionPort, sizeof(PPARAM), (ULONG_PTR)pParam, NULL);
-		if (ret == FALSE)delete pParam;
+		bool ret = PostQueuedCompletionStatus(m_hCompeletionPort, sizeof(PPARAM), (ULONG_PTR)pParam, NULL);
+		if (ret == false)delete pParam;
 		return ret;
 	}
 	bool PopFront(T& data) {
@@ -70,8 +69,8 @@ public:
 			if (hEvent) CloseHandle(hEvent);
 			return false;
 		}
-		BOOL ret = PostQueuedCompletionStatus(m_hCompeletionPort, sizeof(PPARAM), (ULONG_PTR)&Param, NULL);
-		if (ret == FALSE) {
+		bool ret = PostQueuedCompletionStatus(m_hCompeletionPort, sizeof(PPARAM), (ULONG_PTR)&Param, NULL);
+		if (ret == false) {
 			CloseHandle(hEvent);
 			return false;
 		}
@@ -103,8 +102,8 @@ public:
 	bool Clear() {
 		if (m_lock) return false;
 		IocpParam* pParam = new IocpParam(HQClear, T());
-		BOOL ret = PostQueuedCompletionStatus(m_hCompeletionPort, sizeof(PPARAM), (ULONG_PTR)pParam, NULL);
-		if (ret == FALSE)delete pParam;
+		bool ret = PostQueuedCompletionStatus(m_hCompeletionPort, sizeof(PPARAM), (ULONG_PTR)pParam, NULL);
+		if (ret == false)delete pParam;
 		return ret;
 	}
 private:
@@ -147,7 +146,7 @@ private:
 		ULONG_PTR CompletionKey = 0;
 		OVERLAPPED* pOverlapped = NULL;
 		while (GetQueuedCompletionStatus(m_hCompeletionPort, &dwTransferred, &CompletionKey, &pOverlapped, INFINITE)) {
-			if ((dwTransferred == 0) && (CompletionKey == NULL)) {
+			if ((dwTransferred == 0) || (CompletionKey == NULL)) {
 				printf("thread is prepare to exit!\r\n");
 				break;
 			}
@@ -163,7 +162,9 @@ private:
 			pParam = (PPARAM*)CompletionKey;
 			DealParam(pParam);
 		}
-		CloseHandle(m_hCompeletionPort);
+		HANDLE hTemp = m_hCompeletionPort;
+		m_hCompeletionPort = NULL;
+		CloseHandle(hTemp);
 	}
 
 private:

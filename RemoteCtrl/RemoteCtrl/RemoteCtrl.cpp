@@ -130,31 +130,76 @@ void func(void* arg) {
 	}
 }
 
-int main() {
-	if (!CHeTool::Init()) return 1;
-	printf("press any key to exit...\r\n");
+void test() {
 	CHeQueue<std::string> lstStrings;
-	
 	ULONGLONG tick = GetTickCount64();
 	ULONGLONG tick0 = GetTickCount64();
-	while(_kbhit() == 0){
+	ULONGLONG total = GetTickCount64();
+	//while (_kbhit() == 0) {
 		//完成端口把请求和实现分离
-		if (GetTickCount64() - tick0 > 1300) {
-			lstStrings.PushBack("hello wrold!");
-			tick0 = GetTickCount64();
-		}
-		if (GetTickCount64() - tick > 2000) {
+	while (GetTickCount64() - total <= 1000) {
+		//if (GetTickCount64() - tick0 > 1300) {
+		lstStrings.PushBack("hello wrold!");
+		tick0 = GetTickCount64();
+		//}
+	}
+	size_t count = lstStrings.Size();
+	printf("lstString done! size:%d\r\n", count);
+	total = GetTickCount64();
+	while(GetTickCount64()-total <= 1000){
+		//if (GetTickCount64() - tick > 2000) {
 			std::string str;
 			lstStrings.PopFront(str);
 			tick = GetTickCount64();
-			printf("pop from queue:%s\r\n", str.c_str());
-		}
-		Sleep(1);
+			//printf("pop from queue:%s\r\n", str.c_str());
+		//}
+		//Sleep(1);
 	}
-	printf("exit done! size:%d\r\n",lstStrings.Size());
+	printf("exit done! size:%d\r\n", count-lstStrings.Size());
 	lstStrings.Clear();
-	printf("exit done! size:%d\r\n", lstStrings.Size());
-	exit(0);
+
+	std::list<std::string> lstData;
+	total = GetTickCount64();
+	while (GetTickCount64() - total <= 1000) {
+		lstData.push_back("hello wrold!");
+	}
+	count = lstData.size();
+	printf("lstData push done! size:%d\r\n", lstData.size());
+	total = GetTickCount64();
+	while (GetTickCount64() - total <= 250) {
+		if (lstData.size() > 0)lstData.pop_front();
+	}
+	printf("lstData pop done! size:%d\r\n", (count - lstData.size()) * 4);
+}
+
+int main() {
+	if (!CHeTool::Init()) return 1;
+	for (int i = 0; i < 10; i++) {
+		test();
+	}
+	
+// 	printf("press any key to exit...\r\n");
+// 	CHeQueue<std::string> lstStrings;
+// 	ULONGLONG tick = GetTickCount64();
+// 	ULONGLONG tick0 = GetTickCount64();
+// 	while(_kbhit() == 0){
+// 		//完成端口把请求和实现分离
+// 		if (GetTickCount64() - tick0 > 1300) {
+// 			lstStrings.PushBack("hello wrold!");
+// 			tick0 = GetTickCount64();
+// 		}
+// 		if (GetTickCount64() - tick > 2000) {
+// 			std::string str;
+// 			lstStrings.PopFront(str);
+// 			tick = GetTickCount64();
+// 			printf("pop from queue:%s\r\n", str.c_str());
+// 		}
+// 		Sleep(1);
+// 	}
+// 	printf("exit done! size:%d\r\n",lstStrings.Size());
+// 	lstStrings.Clear();
+// 	printf("exit done! size:%d\r\n", lstStrings.Size());
+	
 
 	/*
 	if (CHeTool::IsAdmin()) {
