@@ -78,7 +78,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -144,6 +144,8 @@
     <ClInclude Include="CHeQueue.h" />
     <ClInclude Include="Command.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="HeServer.h" />
+    <ClInclude Include="HeThread.h" />
     <ClInclude Include="HeTool.h" />
     <ClInclude Include="LockDialog.h" />
     <ClInclude Include="Packet.h" />
@@ -154,8 +156,8 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CHeQueue.cpp" />
     <ClCompile Include="Command.cpp" />
+    <ClCompile Include="HeServer.cpp" />
     <ClCompile Include="HeTool.cpp" />
     <ClCompile Include="LockDialog.cpp" />
     <ClCompile Include="pch.cpp">
@@ -166,12 +168,6 @@
     </ClCompile>
     <ClCompile Include="RemoteCtrl.cpp" />
     <ClCompile Include="ServerSocket.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="RemoteCtrl.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="ClassDiagram.cd" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

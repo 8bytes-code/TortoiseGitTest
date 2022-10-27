@@ -8,7 +8,9 @@
 #include "HeTool.h"
 #include "Command.h"
 #include "CHeQueue.h"
+#include "HeServer.h"
 #include <conio.h>
+#include <mswsock.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -62,169 +64,233 @@ bool ChooseAutoInvoke(const CString& strPath) {
 	return true;
 }
 
-typedef struct IocpParm {
-	int nOperator;					//操作
-	std::string strData;			//数据
-	_beginthread_proc_type cbFunc;	//回调
-
-	IocpParm(int op, const char* sData, _beginthread_proc_type cb = NULL) {
-		nOperator = op;
-		strData = sData;
-		cbFunc = cb;
-	}
-	IocpParm() {
-		nOperator = -1;
-	}
-}IOCP_PARAM;
-
-void threadmain(HANDLE hIOCP) {
-	std::list<std::string> lstString;
-	//获取完成端口状态
-	int count = 0, count0 = 0;
-	DWORD dwTransferred = 0;
-	ULONG_PTR CompletionKey = 0;
-	OVERLAPPED* pOverlapped = NULL;
-	while (GetQueuedCompletionStatus(hIOCP, &dwTransferred, &CompletionKey, &pOverlapped, INFINITE)) {
-		if ((dwTransferred == 0) && (CompletionKey == NULL)) {
-			printf("thread is prepare to exit!\r\n");
-			break;
-		}
-		IOCP_PARAM* pParam = (IOCP_PARAM*)CompletionKey;
-		if (pParam->nOperator == IocpListPush) {
-			lstString.push_back(pParam->strData);
-			count0++;
-		}
-		else if (pParam->nOperator == IocpListPop) {
-			std::string Str;
-			if (lstString.size() > 0) {
-				Str = lstString.front();
-				lstString.pop_front();
-			}
-			if (pParam->cbFunc) {
-				pParam->cbFunc(&Str);
-			}
-			count++;
-		}
-		else if (pParam->nOperator == IocpListEmpty) {
-			lstString.clear();
-		}
-		delete pParam;
-	}
-	//lstString.clear();
-	printf("thread exit count %d count0 %d\r\n", count, count0);
-}
-
-void threadQueueEntry(HANDLE hIOCP) {
-	threadmain(hIOCP);
-	_endthread();	//结束线程到此之后代码就终止了，会导致本地对象没法调用析构函数，从而使得内存发生泄漏
-}
-
-void func(void* arg) {
-	std::string* pstr = (std::string*)arg;
-	if (pstr != NULL) {
-		printf("pop from list:%s\r\n", pstr->c_str());
-		//delete pstr;
-	}
-	else {
-		printf("list is empty,not data!\r\n");
-	}
-}
-
-void test() {
-	CHeQueue<std::string> lstStrings;
-	ULONGLONG tick = GetTickCount64();
-	ULONGLONG tick0 = GetTickCount64();
-	ULONGLONG total = GetTickCount64();
-	//while (_kbhit() == 0) {
-		//完成端口把请求和实现分离
-	while (GetTickCount64() - total <= 1000) {
-		//if (GetTickCount64() - tick0 > 1300) {
-		lstStrings.PushBack("hello wrold!");
-		tick0 = GetTickCount64();
-		//}
-	}
-	size_t count = lstStrings.Size();
-	printf("lstString done! size:%d\r\n", count);
-	total = GetTickCount64();
-	while(GetTickCount64()-total <= 1000){
-		//if (GetTickCount64() - tick > 2000) {
-			std::string str;
-			lstStrings.PopFront(str);
-			tick = GetTickCount64();
-			//printf("pop from queue:%s\r\n", str.c_str());
-		//}
-		//Sleep(1);
-	}
-	printf("exit done! size:%d\r\n", count-lstStrings.Size());
-	lstStrings.Clear();
-
-	std::list<std::string> lstData;
-	total = GetTickCount64();
-	while (GetTickCount64() - total <= 1000) {
-		lstData.push_back("hello wrold!");
-	}
-	count = lstData.size();
-	printf("lstData push done! size:%d\r\n", lstData.size());
-	total = GetTickCount64();
-	while (GetTickCount64() - total <= 250) {
-		if (lstData.size() > 0)lstData.pop_front();
-	}
-	printf("lstData pop done! size:%d\r\n", (count - lstData.size()) * 4);
-}
-
-int main() {
-	if (!CHeTool::Init()) return 1;
-	for (int i = 0; i < 10; i++) {
-		test();
-	}
-	
-// 	printf("press any key to exit...\r\n");
+// typedef struct IocpParm {
+// 	int nOperator;					//操作
+// 	std::string strData;			//数据
+// 	_beginthread_proc_type cbFunc;	//回调
+// 
+// 	IocpParm(int op, const char* sData, _beginthread_proc_type cb = NULL) {
+// 		nOperator = op;
+// 		strData = sData;
+// 		cbFunc = cb;
+// 	}
+// 	IocpParm() {
+// 		nOperator = -1;
+// 	}
+// }IOCP_PARAM;
+// 
+// void threadmain(HANDLE hIOCP) {
+// 	std::list<std::string> lstString;
+// 	//获取完成端口状态
+// 	int count = 0, count0 = 0;
+// 	DWORD dwTransferred = 0;
+// 	ULONG_PTR CompletionKey = 0;
+// 	OVERLAPPED* pOverlapped = NULL;
+// 	while (GetQueuedCompletionStatus(hIOCP, &dwTransferred, &CompletionKey, &pOverlapped, INFINITE)) {
+// 		if ((dwTransferred == 0) && (CompletionKey == NULL)) {
+// 			printf("thread is prepare to exit!\r\n");
+// 			break;
+// 		}
+// 		IOCP_PARAM* pParam = (IOCP_PARAM*)CompletionKey;
+// 		if (pParam->nOperator == IocpListPush) {
+// 			lstString.push_back(pParam->strData);
+// 			count0++;
+// 		}
+// 		else if (pParam->nOperator == IocpListPop) {
+// 			std::string Str;
+// 			if (lstString.size() > 0) {
+// 				Str = lstString.front();
+// 				lstString.pop_front();
+// 			}
+// 			if (pParam->cbFunc) {
+// 				pParam->cbFunc(&Str);
+// 			}
+// 			count++;
+// 		}
+// 		else if (pParam->nOperator == IocpListEmpty) {
+// 			lstString.clear();
+// 		}
+// 		delete pParam;
+// 	}
+// 	//lstString.clear();
+// 	printf("thread exit count %d count0 %d\r\n", count, count0);
+// }
+// 
+// void threadQueueEntry(HANDLE hIOCP) {
+// 	threadmain(hIOCP);
+// 	_endthread();	//结束线程到此之后代码就终止了，会导致本地对象没法调用析构函数，从而使得内存发生泄漏
+// }
+// 
+// void func(void* arg) {
+// 	std::string* pstr = (std::string*)arg;
+// 	if (pstr != NULL) {
+// 		printf("pop from list:%s\r\n", pstr->c_str());
+// 		//delete pstr;
+// 	}
+// 	else {
+// 		printf("list is empty,not data!\r\n");
+// 	}
+// }
+// 
+// void test() {
 // 	CHeQueue<std::string> lstStrings;
 // 	ULONGLONG tick = GetTickCount64();
 // 	ULONGLONG tick0 = GetTickCount64();
-// 	while(_kbhit() == 0){
+// 	ULONGLONG total = GetTickCount64();
+// 	//while (_kbhit() == 0) {
 // 		//完成端口把请求和实现分离
-// 		if (GetTickCount64() - tick0 > 1300) {
-// 			lstStrings.PushBack("hello wrold!");
-// 			tick0 = GetTickCount64();
-// 		}
-// 		if (GetTickCount64() - tick > 2000) {
+// 	while (GetTickCount64() - total <= 1000) {
+// 		//if (GetTickCount64() - tick0 > 1300) {
+// 		lstStrings.PushBack("hello wrold!");
+// 		tick0 = GetTickCount64();
+// 		//}
+// 	}
+// 	size_t count = lstStrings.Size();
+// 	printf("lstString done! size:%d\r\n", count);
+// 	total = GetTickCount64();
+// 	while(GetTickCount64()-total <= 1000){
+// 		//if (GetTickCount64() - tick > 2000) {
 // 			std::string str;
 // 			lstStrings.PopFront(str);
 // 			tick = GetTickCount64();
-// 			printf("pop from queue:%s\r\n", str.c_str());
-// 		}
-// 		Sleep(1);
+// 			//printf("pop from queue:%s\r\n", str.c_str());
+// 		//}
+// 		//Sleep(1);
 // 	}
-// 	printf("exit done! size:%d\r\n",lstStrings.Size());
+// 	printf("exit done! size:%d\r\n", count-lstStrings.Size());
 // 	lstStrings.Clear();
-// 	printf("exit done! size:%d\r\n", lstStrings.Size());
-	
+// 
+// 	std::list<std::string> lstData;
+// 	total = GetTickCount64();
+// 	while (GetTickCount64() - total <= 1000) {
+// 		lstData.push_back("hello wrold!");
+// 	}
+// 	count = lstData.size();
+// 	printf("lstData push done! size:%d\r\n", lstData.size());
+// 	total = GetTickCount64();
+// 	while (GetTickCount64() - total <= 250) {
+// 		if (lstData.size() > 0)lstData.pop_front();
+// 	}
+// 	printf("lstData pop done! size:%d\r\n", (count - lstData.size()) * 4);
+// }
 
-	/*
-	if (CHeTool::IsAdmin()) {
-		if (!CHeTool::Init()) return 1;
-		if (ChooseAutoInvoke(INVOKE_PATH)) {
-			CCommand cmd;
-			int ret = CServerSocket::getInstance()->Run(&CCommand::RunCommand, &cmd);
-			switch (ret) {
-				case -1:
-					MessageBox(NULL, _T("网络初始化异常，未能成功初始化，请检查网络状况！"), _T("网络初始化失败"), MB_OK | MB_ICONERROR);
-					break;
-				case -2:
-					MessageBox(NULL, _T("多次重连仍无法接入，结束本程序！"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
-					break;
-				default:break;
+//完全端口的一个映射
+void iocp();
+
+int main() {
+	if (!CHeTool::Init()) return 1;
+
+	iocp();
+
+	// 	printf("press any key to exit...\r\n");
+	// 	CHeQueue<std::string> lstStrings;
+	// 	ULONGLONG tick = GetTickCount64();
+	// 	ULONGLONG tick0 = GetTickCount64();
+	// 	while(_kbhit() == 0){
+	// 		//完成端口把请求和实现分离
+	// 		if (GetTickCount64() - tick0 > 1300) {
+	// 			lstStrings.PushBack("hello wrold!");
+	// 			tick0 = GetTickCount64();
+	// 		}
+	// 		if (GetTickCount64() - tick > 2000) {
+	// 			std::string str;
+	// 			lstStrings.PopFront(str);
+	// 			tick = GetTickCount64();
+	// 			printf("pop from queue:%s\r\n", str.c_str());
+	// 		}
+	// 		Sleep(1);
+	// 	}
+	// 	printf("exit done! size:%d\r\n",lstStrings.Size());
+	// 	lstStrings.Clear();
+	// 	printf("exit done! size:%d\r\n", lstStrings.Size());
+
+
+		/*
+		if (CHeTool::IsAdmin()) {
+			if (!CHeTool::Init()) return 1;
+			if (ChooseAutoInvoke(INVOKE_PATH)) {
+				CCommand cmd;
+				int ret = CServerSocket::getInstance()->Run(&CCommand::RunCommand, &cmd);
+				switch (ret) {
+					case -1:
+						MessageBox(NULL, _T("网络初始化异常，未能成功初始化，请检查网络状况！"), _T("网络初始化失败"), MB_OK | MB_ICONERROR);
+						break;
+					case -2:
+						MessageBox(NULL, _T("多次重连仍无法接入，结束本程序！"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
+						break;
+					default:break;
+				}
 			}
 		}
-	}
-	else {
-		//如果还不是管理员权限就要再去提权
-		if (CHeTool::RunAsAdmin() == false) {
-			CHeTool::ShowError();
-			return 1;
+		else {
+			//如果还不是管理员权限就要再去提权
+			if (CHeTool::RunAsAdmin() == false) {
+				CHeTool::ShowError();
+				return 1;
+			}
 		}
-	}
-	*/
+		*/
 	return 0;
+}
+
+class COverlapped {
+public:
+	OVERLAPPED m_overlapped;
+	DWORD m_operator;
+	char m_buffer[4096];
+	COverlapped() {
+		m_operator = 0;
+		memset(&m_overlapped, 0, sizeof(m_overlapped));
+		memset(&m_buffer, 0, sizeof(m_buffer));
+	}
+};
+
+void iocp() {
+// 	//SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);	//TCP
+// 	SOCKET sock = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+// 	if (sock == INVALID_SOCKET) {
+// 		CHeTool::ShowError();
+// 		return;
+// 	}
+// 	SOCKET client = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+// 	//经典网络填参数
+// 	sockaddr_in addr;
+// 	addr.sin_family = PF_INET;
+// 	addr.sin_addr.s_addr = inet_addr("0.0.0.0");
+// 	addr.sin_port = htons(9527);
+// 	//构造iocp
+// 	HANDLE hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, sock, 4);
+// 	CreateIoCompletionPort((HANDLE)sock, hIOCP, 0, 0); //跟sock绑定
+// 	//绑定 套接字和网络参数
+// 	bind(sock, (sockaddr*)&addr, sizeof(addr));
+// 	//监听
+// 	listen(sock, 5);
+// 	//相当于一个连接
+// 	COverlapped overlapped;
+// 	overlapped.m_operator = 1;	//accpet
+// 	memset(&overlapped, 0, sizeof(OVERLAPPED));
+// 	DWORD received = 0;
+// 	//acceptex异步不会阻塞状态，等待投递之后就会返回
+// 	if (AcceptEx(sock, client, overlapped.m_buffer, 0, sizeof(sockaddr_in) + 16, sizeof(sockaddr_in) + 16, &received, &overlapped.m_overlapped) == FALSE) {
+// 		CHeTool::ShowError();
+// 	}
+// 
+// 	while (true) {	//代表一个线程
+// 		LPOVERLAPPED pOverlapped = NULL;
+// 		DWORD transferred = 0;
+// 		DWORD key = 0;
+// 		//有连接之后状态改变
+// 		if (GetQueuedCompletionStatus(hIOCP, &transferred, &key, &pOverlapped, INFINITE)) {
+// 			//获取重叠结构
+// 			COverlapped* pOl = CONTAINING_RECORD(pOverlapped, COverlapped, m_overlapped);
+// 			switch (pOl->m_operator) {
+// 				case 1:	//处理accept的操作
+// 
+// 					break;
+// 			}
+// 		}
+// 	}
+	HeServer server;
+	server.StartService();
+	getchar();
 }
