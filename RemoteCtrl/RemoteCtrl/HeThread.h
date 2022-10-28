@@ -11,7 +11,7 @@ typedef int (ThreadFuncBase::* FUNCTYPE)();
 class ThreadWorker{
 public:
 	ThreadWorker():thiz(NULL), func(NULL) {}
-	ThreadWorker(ThreadFuncBase* obj, FUNCTYPE f):thiz(obj), func(f) {}
+	ThreadWorker(void* obj, FUNCTYPE f): thiz((ThreadFuncBase*)obj), func(f) {}
 	ThreadWorker(const ThreadWorker& worker) {
 		thiz = worker.thiz;
 		func = worker.func;
@@ -98,7 +98,7 @@ public:
 private:
 	void ThreadWorker() {
 		while (m_bStatus) {
-			if (m_worker.load() == NULL) {
+			if (m_worker == NULL) {
 				Sleep(1);
 				continue;
 			}
@@ -112,7 +112,9 @@ private:
 				}
 				if (ret < 0) {
 					//存入一个无效的值
+					::ThreadWorker* pWorker = m_worker.load();
 					m_worker.store(NULL);
+					delete pWorker;
 				}
 			}
 			else {
