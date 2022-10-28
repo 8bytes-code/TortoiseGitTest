@@ -1,4 +1,5 @@
 #pragma once
+
 class CHeTool {
 public:
 	//使用静态方法，转变成一个相对的全局函数

@@ -1,5 +1,6 @@
 #pragma once
 #include "pch.h"
+#include "HeThread.h"
 #include <list>
 #include <atomic>
 
@@ -40,7 +41,7 @@ public:
 			m_hThread = (HANDLE)_beginthread(&CHeQueue<T>::theradEntry, 0, this);
 		}
 	}
-	~CHeQueue() {
+	virtual ~CHeQueue() {
 		if (m_lock)return;
 		m_lock = true;
 		PostQueuedCompletionStatus(m_hCompeletionPort, 0, NULL, NULL);
@@ -61,7 +62,7 @@ public:
 		if (ret == false)delete pParam;
 		return ret;
 	}
-	bool PopFront(T& data) {
+	virtual bool PopFront(T& data) {
 		//pop的时候期望要标记这个值，老办法用事件
 		HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 		IocpParam Param(HQPop, data, hEvent);
@@ -106,14 +107,14 @@ public:
 		if (ret == false)delete pParam;
 		return ret;
 	}
-private:
+protected:
 	static void theradEntry(void* arg) {
 		CHeQueue<T>* thiz = (CHeQueue<T>*)arg;
 		thiz->threadMain();
 		_endthread();
 	}
 
-	void DealParam(PPARAM* pParam) {
+	virtual void DealParam(PPARAM* pParam) {
 		switch (pParam->nOperator) {
 			case HQPush:
 				m_lstData.push_back(pParam->Data);
@@ -167,10 +168,90 @@ private:
 		CloseHandle(hTemp);
 	}
 
-private:
+protected:
 	std::list<T> m_lstData;
 	HANDLE m_hCompeletionPort;
 	HANDLE m_hThread;
 	std::atomic<bool> m_lock;				//队列析构
 };
 
+
+template<class T>
+class HeSendQueue :public CHeQueue<T>,public ThreadFuncBase {
+public:
+	typedef int(ThreadFuncBase::* HECALLBACK)(T& data);
+	HeSendQueue(ThreadFuncBase* obj, HECALLBACK callback)
+		:CHeQueue<T>(), m_base(obj), m_callback(callback)
+	{
+		m_thread.Start();
+		m_thread.UpdateWorker(::ThreadWorker(this, (FUNCTYPE) & HeSendQueue<T>::threadTick));
+	}
+
+	virtual	~HeSendQueue() {
+		m_base = NULL;
+		m_callback = NULL;
+		m_thread.Stop();
+	}
+protected:
+	virtual bool PopFront(T& data) {
+		return false;
+	}
+	bool PopFront() {
+		typename CHeQueue<T>::IocpParam* Param = new  typename CHeQueue<T>::IocpParam(CHeQueue<T>::HQPop, T());
+		if (CHeQueue<T>::m_lock) {
+			delete Param;
+			return false;
+		}
+		bool ret = PostQueuedCompletionStatus(CHeQueue<T>::m_hCompeletionPort, sizeof(*Param), (ULONG_PTR)&Param, NULL);
+		if (ret == false) {
+			delete Param;
+			return false;
+		}
+		return ret;
+	}
+
+	int threadTick() {
+		if (WaitForSingleObject(CHeQueue<T>::m_hThread, 0) != WAIT_TIMEOUT) {
+			return 0;
+		}
+		if (CHeQueue<T>::m_lstData.size() > 0) {
+			PopFront();
+		}
+		//Sleep(1);
+		return 0;
+	}
+
+	virtual void DealParam(typename CHeQueue<T>::PPARAM* pParam) {
+		switch (pParam->nOperator) {
+			case CHeQueue<T>::HQPush:
+				CHeQueue<T>::m_lstData.push_back(pParam->Data);
+				delete pParam;
+				break;
+			case CHeQueue<T>::HQPop:
+				if (CHeQueue<T>::m_lstData.size() > 0) {
+					pParam->Data = CHeQueue<T>::m_lstData.front();
+					if((m_base->*m_callback)(pParam->Data)==0)
+						CHeQueue<T>::m_lstData.pop_front();
+				}
+				delete pParam;
+				break;
+			case CHeQueue<T>::HQSize:
+				pParam->nOperator = CHeQueue<T>::m_lstData.size();
+				if (pParam->hEvent != NULL) SetEvent(pParam->hEvent);
+				break;
+			case CHeQueue<T>::HQClear:
+				CHeQueue<T>::m_lstData.clear();
+				delete pParam;
+				break;
+			default:
+				TRACE("[%s]:threadMain error!\r\n", __FUNCTION__);
+				break;
+		}
+	}
+private:
+	ThreadFuncBase* m_base;
+	HECALLBACK m_callback;
+	HeThread m_thread;
+};
+
+typedef HeSendQueue<std::vector<char>>::HECALLBACK SENDCALLBACK;

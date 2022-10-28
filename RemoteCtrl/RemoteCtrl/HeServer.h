@@ -1,5 +1,6 @@
 #pragma once
 #include "HeThread.h"
+#include "HeTool.h"
 #include <map>
 #include "CHeQueue.h"
 #include <MSWSock.h>
@@ -24,8 +25,11 @@ public:
 	std::vector<char> m_buffer;	//缓冲区
 	ThreadWorker m_worker;		//处理函数
 	HeServer* m_server;			//服务器对象
-	PCLIENT m_client;			//对应客户端
+	HeClient* m_client;			//对应客户端
 	WSABUF m_wsabuffer;
+	virtual ~HeOverlapped() {
+		m_buffer.clear();
+	}
 };
 
 template<HeOperator> class AcceptOverlapped;
@@ -36,11 +40,16 @@ template<HeOperator> class SendOverlapped;
 typedef SendOverlapped<HSend> SENDOVERLAPPED;
 
 
-class HeClient {
+class HeClient:public ThreadFuncBase {
 public:
 	HeClient();
 	~HeClient() {
+		m_buffer.clear();
 		closesocket(m_sock);
+		m_recv.reset();
+		m_send.reset();
+		m_pOverlapped.reset();
+		m_vecSend.Clear();
 	}
 	void SetOverlapped(PCLIENT& ptr);
 
@@ -61,12 +70,9 @@ public:
 	sockaddr_in* GetLocalAddr() { return &m_laddr; }
 	sockaddr_in* GetRemoteAddr() { return &m_raddr; }
 	size_t GetBufferSize()const { return m_buffer.size(); }
-	int Recv() {
-		int ret = recv(m_sock, m_buffer.data(), m_buffer.size(), 0);
-		if (ret <= 0) return -1;
-		m_used += (size_t)ret;
-		return 0;
-	}
+	int Recv();
+	int Send(void* buffer, size_t nSize);
+	int SendData(std::vector<char>& data);
 private:
 	SOCKET m_sock;
 	DWORD m_received;
@@ -79,6 +85,7 @@ private:
 	sockaddr_in m_laddr;			//本地地址
 	sockaddr_in m_raddr;			//远程地址
 	bool m_isbusy;					//状态
+	HeSendQueue<std::vector<char>> m_vecSend;	//send队列
 };
 
 template<HeOperator>
@@ -86,7 +93,6 @@ class AcceptOverlapped :public HeOverlapped, ThreadFuncBase {
 public:
 	AcceptOverlapped();
 	int AcceptWorker();
-	PCLIENT m_client;
 };
 
 
@@ -106,6 +112,9 @@ class SendOverlapped :public HeOverlapped, ThreadFuncBase {
 public:
 	SendOverlapped();
 	int SendWorker() {
+		/*
+		* 1.send完成没有这么快，并发量比较大的时候
+		*/
 		return -1;
 	}
 };
@@ -134,7 +143,7 @@ public:
 		m_addr.sin_port = htons(port);
 		m_addr.sin_addr.s_addr = inet_addr(ip.c_str());
 	}
-	~HeServer(){}
+	~HeServer();
 	bool StartService();
 	bool NewAccept() {
 		PCLIENT pClient(new HeClient());

@@ -41,6 +41,7 @@ class HeThread {
 public:
 	HeThread() {
 		m_hThread = NULL;
+		m_bStatus = false;
 	}
 
 	~HeThread() {
@@ -58,9 +59,13 @@ public:
 	bool Stop() {
 		if (m_bStatus == false) return true;
 		m_bStatus = false;
-		bool ret = WaitForSingleObject(m_hThread, INFINITE) == WAIT_OBJECT_0;
+		DWORD ret = WaitForSingleObject(m_hThread, 1000);
+		if (ret == WAIT_TIMEOUT) {
+			//强制终止
+			TerminateThread(m_hThread, -1);
+		}
 		UpdateWorker();
-		return ret;
+		return ret == WAIT_OBJECT_0;
 	}
 
 	bool IsValid() {
@@ -70,25 +75,33 @@ public:
 	}
 
 	void UpdateWorker(const ::ThreadWorker& worker = ::ThreadWorker()) {
-		if (!worker.IsValid()) {
-			m_worker.store(NULL);
-			return;
-		}
-		if (m_worker.load() != NULL) {
+		//哎，内存泄露，需要注意，任务不为空且不重复才可以进行
+		if (m_worker.load() != NULL && (m_worker.load() != &worker)) {
 			::ThreadWorker* pWorker = m_worker.load();
 			m_worker.store(NULL);
 			delete pWorker;
 		}
+		if (m_worker.load() == &worker) return;
+		if (!worker.IsValid()) {
+			m_worker.store(NULL);
+			return;
+		}
+		
 		m_worker.store(new ::ThreadWorker(worker));
 	}
 
 	bool Isdle() {
 		//返回ture表示空闲，false表示已经有任务了
+		if (m_worker.load() == NULL)return true;
 		return !m_worker.load()->IsValid();
 	}
 private:
 	void ThreadWorker() {
 		while (m_bStatus) {
+			if (m_worker.load() == NULL) {
+				Sleep(1);
+				continue;
+			}
 			::ThreadWorker worker = *m_worker.load();
 			if (worker.IsValid()) {
 				int ret = worker();
@@ -132,6 +145,11 @@ public:
 	HeThreadPool(){}
 	~HeThreadPool(){
 		Stop();
+		//由于构造时是通过new的，且没有啥基类，要靠自己释放
+		for (size_t i = 0; i < m_thread.size(); i++) {
+			delete m_thread[i];
+			m_thread[i] = NULL;
+		}
 		m_thread.clear();
 	}
 
